@@ -18,6 +18,7 @@ export default function ProductsManager({
   // 🔍 SEARCH
   const filtered = products.filter((p) => {
     const q = query.toLowerCase();
+
     return (
       p.name?.toLowerCase().includes(q) ||
       p.barcode?.toLowerCase().includes(q) ||
@@ -25,22 +26,27 @@ export default function ProductsManager({
     );
   });
 
-  // ⚠️ EXPIRY WARNING
-  const isExpired = (date: string | null) => {
-    if (!date) return false;
-    return new Date(date) < new Date();
-  };
+  // 🗑️ DELETE
+  const deleteProduct = async (id: string) => {
+    if (!confirm("Delete product?")) return;
 
-  const isExpiringSoon = (date: string | null) => {
-    if (!date) return false;
-    const d = new Date(date);
-    const now = new Date();
-    const diff = d.getTime() - now.getTime();
-    return diff > 0 && diff < 1000 * 60 * 60 * 24 * 7; // 7 days
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    router.refresh();
   };
 
   // 💾 SAVE EDIT
   const saveProduct = async () => {
+    if (!editing) return;
+
     setLoading(true);
 
     const { error } = await supabase
@@ -68,96 +74,60 @@ export default function ProductsManager({
     router.refresh();
   };
 
-  // 🗑️ DELETE
-  const deleteProduct = async (id: string) => {
-    if (!confirm("Delete product?")) return;
-
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    router.refresh();
-  };
-
   return (
     <div>
 
       {/* 🔍 SEARCH BAR */}
       <input
-        className="w-full border p-3 rounded-xl mb-6"
-        placeholder="Search products (name, barcode, description)..."
+        className="w-full border p-3 rounded-xl mb-6 bg-white"
+        placeholder="Search by name, barcode, description..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      {/* 📦 GRID */}
+      {/* 📦 PRODUCTS GRID */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
-        {filtered.map((p) => (
+        {filtered.map((product) => (
           <div
-            key={p.id}
-            className={`border rounded-2xl p-5 ${
-              isExpired(p.expiry_date)
-                ? "border-red-500"
-                : isExpiringSoon(p.expiry_date)
-                ? "border-yellow-500"
-                : ""
-            }`}
+            key={product.id}
+            className="border rounded-2xl p-5 bg-white shadow-sm"
           >
 
-            {/* NAME */}
             <h2 className="font-semibold text-lg">
-              {p.name}
+              {product.name}
             </h2>
 
-            {/* BADGES */}
-            {isExpired(p.expiry_date) && (
-              <p className="text-red-600 text-sm">
-                ⚠️ Expired
-              </p>
-            )}
-
-            {!isExpired(p.expiry_date) &&
-              isExpiringSoon(p.expiry_date) && (
-                <p className="text-yellow-600 text-sm">
-                  ⚠️ Expiring soon
-                </p>
-              )}
-
             <p className="text-sm text-gray-600">
-              Barcode: {p.barcode}
+              Barcode: {product.barcode}
             </p>
 
             <p className="text-sm text-gray-600">
-              Owner: {p.owner}
+              Owner: {product.owner || "—"}
             </p>
 
             <div className="mt-2 flex justify-between text-sm">
-              <span>💰 {p.price ?? "—"}</span>
-              <span>📦 {p.quantity}</span>
+              <span>💰 {product.price ?? "—"}</span>
+              <span>📦 {product.quantity ?? 0}</span>
             </div>
 
-            {/* ACTIONS */}
+            {/* BUTTONS */}
             <div className="mt-4 flex gap-2">
+
               <button
-                onClick={() => setEditing(p)}
+                onClick={() => setEditing(product)}
                 className="flex-1 bg-black text-white rounded-xl py-2"
               >
                 Edit
               </button>
 
               <button
-                onClick={() => deleteProduct(p.id)}
-                className="bg-red-500 text-white rounded-xl px-3"
+                onClick={() => deleteProduct(product.id)}
+                className="bg-red-500 text-white px-3 rounded-xl"
               >
                 Delete
               </button>
+
             </div>
           </div>
         ))}
@@ -168,7 +138,7 @@ export default function ProductsManager({
       {editing && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
 
-          <div className="bg-white w-full max-w-2xl p-6 rounded-3xl">
+          <div className="bg-white w-full max-w-2xl rounded-3xl p-6">
 
             <h2 className="text-xl font-bold mb-4">
               Edit Product
@@ -191,14 +161,20 @@ export default function ProductsManager({
             />
 
             <input
-              type="date"
               className="w-full border p-3 rounded-xl mb-2"
-              value={editing.expiry_date || ""}
+              type="number"
+              value={editing.price || ""}
               onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  expiry_date: e.target.value,
-                })
+                setEditing({ ...editing, price: Number(e.target.value) })
+              }
+            />
+
+            <input
+              className="w-full border p-3 rounded-xl mb-2"
+              type="number"
+              value={editing.quantity || 0}
+              onChange={(e) =>
+                setEditing({ ...editing, quantity: Number(e.target.value) })
               }
             />
 
@@ -227,7 +203,7 @@ export default function ProductsManager({
                 disabled={loading}
                 className="px-4 py-2 bg-black text-white rounded-xl"
               >
-                Save
+                {loading ? "Saving..." : "Save"}
               </button>
 
             </div>
