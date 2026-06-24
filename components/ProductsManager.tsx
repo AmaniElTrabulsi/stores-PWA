@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 export default function ProductsManager({
   products,
@@ -12,13 +13,12 @@ export default function ProductsManager({
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [barcodeInput, setBarcodeInput] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [foundId, setFoundId] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
-  const inputRef = useRef<HTMLInputElement>(null);
-
+  // 📦 FILTER
   const filtered = products.filter((p) => {
     const q = query.toLowerCase();
 
@@ -28,23 +28,39 @@ export default function ProductsManager({
     );
   });
 
-  // 📦 SCAN BARCODE
-  const handleScan = (value: string) => {
-    setBarcodeInput(value);
+  // 📷 CAMERA SCANNER
+  useEffect(() => {
+    if (!scannerOpen) return;
 
-    const product = products.find(
-      (p) => String(p.barcode) === String(value)
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: 250 },
+      false
     );
 
-    if (product) {
-      setFoundId(product.id);
+    scanner.render(
+      (decodedText) => {
+        const product = products.find(
+          (p) => String(p.barcode) === String(decodedText)
+        );
 
-      // auto-open edit (optional)
-      // setEditing(product);
+        if (product) {
+          setFoundId(product.id);
+          setTimeout(() => setFoundId(null), 2000);
+        }
 
-      setTimeout(() => setFoundId(null), 2000);
-    }
-  };
+        scanner.clear();
+        setScannerOpen(false);
+      },
+      (error) => {
+        // ignore scan errors
+      }
+    );
+
+    return () => {
+      scanner.clear().catch(() => {});
+    };
+  }, [scannerOpen, products]);
 
   const deleteProduct = async (id: string) => {
     await supabase.from("products").delete().eq("id", id);
@@ -75,10 +91,9 @@ export default function ProductsManager({
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6 rounded-3xl">
 
-      {/* SEARCH + SCANNER */}
+      {/* SEARCH + SCAN BUTTON */}
       <div className="mb-6 space-y-3">
 
-        {/* Normal search */}
         <input
           className="w-full px-4 py-3 rounded-2xl border bg-white"
           placeholder="Search products..."
@@ -86,24 +101,32 @@ export default function ProductsManager({
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        {/* Barcode scanner input */}
-        <input
-          ref={inputRef}
-          className="w-full px-4 py-3 rounded-2xl border bg-white focus:ring-2 focus:ring-pink-300"
-          placeholder="Scan barcode here..."
-          value={barcodeInput}
-          onChange={(e) => handleScan(e.target.value)}
-        />
-
-        {barcodeInput && (
-          <p className="text-sm text-gray-600">
-            Scanned: <b>{barcodeInput}</b>
-          </p>
-        )}
+        <button
+          onClick={() => setScannerOpen(true)}
+          className="w-full py-3 rounded-2xl bg-black text-white"
+        >
+          📷 Scan Barcode
+        </button>
 
       </div>
 
-      {/* PRODUCTS GRID (2 PER ROW) */}
+      {/* CAMERA SCANNER */}
+      {scannerOpen && (
+        <div className="mb-6">
+          <div
+            id="reader"
+            className="w-full rounded-3xl overflow-hidden"
+          />
+          <button
+            onClick={() => setScannerOpen(false)}
+            className="mt-3 w-full py-2 rounded-xl border"
+          >
+            Close Scanner
+          </button>
+        </div>
+      )}
+
+      {/* GRID (2 PER ROW) */}
       <div className="grid grid-cols-2 gap-6">
 
         {filtered.map((product) => (
@@ -118,15 +141,21 @@ export default function ProductsManager({
               {product.name}
             </h2>
 
-            <p className="text-sm text-gray-500">
-              Barcode: {product.barcode || "—"}
-            </p>
+            {/* PRICE + STOCK + BARCODE */}
+            <div className="mt-4 space-y-2 text-sm bg-gray-50 p-3 rounded-xl">
 
-            <div className="mt-4 flex justify-between text-sm bg-gray-50 p-3 rounded-xl">
-              <span>💰 {product.price ?? "—"}</span>
-              <span>📦 {product.quantity ?? 0}</span>
+              <div className="flex justify-between">
+                <span>💰 {product.price ?? "—"}</span>
+                <span>📦 {product.quantity ?? 0}</span>
+              </div>
+
+              <div className="text-xs text-gray-500">
+                🔖 {product.barcode || "No barcode"}
+              </div>
+
             </div>
 
+            {/* ACTIONS */}
             <div className="mt-5 flex justify-between">
 
               <button
