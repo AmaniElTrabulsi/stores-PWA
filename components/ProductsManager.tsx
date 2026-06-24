@@ -20,14 +20,11 @@ export default function ProductsManager({
 
     return (
       String(p.name || "").toLowerCase().includes(q) ||
-      String(p.barcode || "").toLowerCase().includes(q) ||
-      String(p.description || "").toLowerCase().includes(q)
+      String(p.barcode || "").toLowerCase().includes(q)
     );
   });
 
   const deleteProduct = async (id: string) => {
-    if (!confirm("Delete product?")) return;
-
     await supabase.from("products").delete().eq("id", id);
     router.refresh();
   };
@@ -54,15 +51,17 @@ export default function ProductsManager({
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6 rounded-3xl">
 
       {/* SEARCH */}
-      <input
-        className="w-full border rounded-2xl p-3 mb-6 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
-        placeholder="Search products..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <div className="mb-6">
+        <input
+          className="w-full px-4 py-3 rounded-2xl border bg-white/70 backdrop-blur shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+          placeholder="Search products..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
       {/* GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -70,40 +69,52 @@ export default function ProductsManager({
         {filtered.map((product) => (
           <div
             key={product.id}
-            className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-lg transition"
+            className="bg-white/80 backdrop-blur border border-white shadow-md rounded-3xl p-5 hover:scale-[1.02] transition-all duration-200"
           >
 
-            <h2 className="font-bold text-lg text-gray-900">
-              {product.name}
-            </h2>
+            {/* TOP BAR */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-800">
+                {product.name}
+              </h2>
 
-            <p className="text-sm text-gray-500">
-              Barcode: {product.barcode || "—"}
-            </p>
+              <span className="text-xs px-3 py-1 rounded-full bg-gradient-to-r from-pink-200 to-purple-200 text-gray-700">
+                #{product.barcode || "—"}
+              </span>
+            </div>
 
-            <div className="mt-4 flex justify-between text-sm bg-gray-50 rounded-xl p-3">
-              <span>💰 {product.price ?? "—"}</span>
-              <span>📦 {product.quantity ?? 0}</span>
+            {/* INFO CARDS */}
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+
+
+              <div className="rounded-2xl p-3 bg-gradient-to-br from-blue-100 to-cyan-100">
+                <p className="text-xs text-gray-600">Stock</p>
+                <p className="font-bold text-gray-800">
+                  📦 {product.quantity ?? 0}
+                </p>
+              </div>
+
             </div>
 
             {/* ACTIONS */}
-            <div className="mt-4 flex gap-2">
+            <div className="mt-5 flex justify-between items-center">
 
               <button
                 onClick={() => setEditing(product)}
-                className="flex-1 bg-black text-white rounded-xl py-2"
+                className="text-xs px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow hover:opacity-90 transition"
               >
-                Edit
+                ✏️ Edit
               </button>
 
               <button
                 onClick={() => deleteProduct(product.id)}
-                className="bg-red-500 text-white px-4 rounded-xl"
+                className="text-xs px-4 py-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition"
               >
-                Delete
+                🗑 Delete
               </button>
 
             </div>
+
           </div>
         ))}
 
@@ -111,75 +122,81 @@ export default function ProductsManager({
 
       {/* EMPTY STATE */}
       {filtered.length === 0 && (
-        <div className="text-center py-10 text-gray-500">
+        <div className="text-center py-16 text-gray-500">
           No products found
         </div>
       )}
 
-      {/* EDIT MODAL */}
+      {/* MODAL */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-3xl p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
 
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-white w-full max-w-xl rounded-3xl p-6 shadow-2xl">
+
+            <h2 className="text-xl font-semibold mb-5">
               Edit Product
             </h2>
 
-            <input
-              className="w-full border p-3 rounded-xl mb-2"
-              value={editing.name}
-              onChange={(e) =>
-                setEditing({ ...editing, name: e.target.value })
-              }
-            />
+            <div className="space-y-3">
 
-            <input
-              className="w-full border p-3 rounded-xl mb-2"
-              value={editing.barcode || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, barcode: e.target.value })
-              }
-            />
+              <input
+                className="w-full border rounded-2xl p-3"
+                value={editing.name || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, name: e.target.value })
+                }
+              />
 
-            <input
-              className="w-full border p-3 rounded-xl mb-2"
-              type="number"
-              value={editing.price || 0}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  price: Number(e.target.value),
-                })
-              }
-            />
+              <input
+                className="w-full border rounded-2xl p-3"
+                value={editing.barcode || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, barcode: e.target.value })
+                }
+              />
 
-            <input
-              className="w-full border p-3 rounded-xl mb-2"
-              type="number"
-              value={editing.quantity || 0}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  quantity: Number(e.target.value),
-                })
-              }
-            />
+              <input
+                type="number"
+                className="w-full border rounded-2xl p-3"
+                value={editing.price || 0}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    price: Number(e.target.value),
+                  })
+                }
+              />
 
-            <textarea
-              className="w-full border p-3 rounded-xl mb-2"
-              value={editing.description || ""}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  description: e.target.value,
-                })
-              }
-            />
+              <input
+                type="number"
+                className="w-full border rounded-2xl p-3"
+                value={editing.quantity || 0}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    quantity: Number(e.target.value),
+                  })
+                }
+              />
 
-            <div className="flex justify-end gap-2 mt-4">
+              <textarea
+                className="w-full border rounded-2xl p-3"
+                value={editing.description || ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    description: e.target.value,
+                  })
+                }
+              />
+
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+
               <button
                 onClick={() => setEditing(null)}
-                className="px-4 py-2 border rounded-xl"
+                className="px-5 py-2 rounded-2xl border"
               >
                 Cancel
               </button>
@@ -187,13 +204,15 @@ export default function ProductsManager({
               <button
                 onClick={saveProduct}
                 disabled={loading}
-                className="px-4 py-2 bg-black text-white rounded-xl"
+                className="px-5 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white"
               >
                 {loading ? "Saving..." : "Save"}
               </button>
+
             </div>
 
           </div>
+
         </div>
       )}
 
