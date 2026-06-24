@@ -15,18 +15,16 @@ export default function ProductsManager({
   const [editing, setEditing] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🔍 SEARCH
   const filtered = products.filter((p) => {
     const q = query.toLowerCase();
 
     return (
-      p.name?.toLowerCase().includes(q) ||
-      p.barcode?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q)
+      String(p.name || "").toLowerCase().includes(q) ||
+      String(p.barcode || "").toLowerCase().includes(q) ||
+      String(p.description || "").toLowerCase().includes(q)
     );
   });
 
-  // 🗑️ DELETE
   const deleteProduct = async (id: string) => {
     if (!confirm("Delete product?")) return;
 
@@ -43,7 +41,6 @@ export default function ProductsManager({
     router.refresh();
   };
 
-  // 💾 SAVE EDIT
   const saveProduct = async () => {
     if (!editing) return;
 
@@ -76,8 +73,6 @@ export default function ProductsManager({
 
   return (
     <div>
-
-      {/* 🔍 SEARCH BAR */}
       <input
         className="w-full border p-3 rounded-xl mb-6 bg-white"
         placeholder="Search by name, barcode, description..."
@@ -85,68 +80,67 @@ export default function ProductsManager({
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      {/* 📦 PRODUCTS GRID */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {filtered.length === 0 ? (
+        <div className="bg-white border rounded-2xl p-8 text-center">
+          <h2 className="text-lg font-semibold">No products found</h2>
+          <p className="text-gray-500 mt-2">
+            Products received: {products.length}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-6">
+          {filtered.map((product) => (
+            <div
+              key={product.id}
+              className="border rounded-2xl p-5 bg-white shadow-sm"
+            >
+              <h2 className="font-semibold text-lg">
+                {product.name || "Unnamed Product"}
+              </h2>
 
-        {filtered.map((product) => (
-          <div
-            key={product.id}
-            className="border rounded-2xl p-5 bg-white shadow-sm"
-          >
+              <p className="text-sm text-gray-600">
+                Barcode: {product.barcode || "—"}
+              </p>
 
-            <h2 className="font-semibold text-lg">
-              {product.name}
-            </h2>
+              <p className="text-sm text-gray-600">
+                Owner: {product.owner || "—"}
+              </p>
 
-            <p className="text-sm text-gray-600">
-              Barcode: {product.barcode}
-            </p>
+              <div className="mt-2 flex justify-between text-sm">
+                <span>💰 {product.price ?? "—"}</span>
+                <span>📦 {product.quantity ?? 0}</span>
+              </div>
 
-            <p className="text-sm text-gray-600">
-              Owner: {product.owner || "—"}
-            </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setEditing(product)}
+                  className="flex-1 bg-black text-white rounded-xl py-2"
+                >
+                  Edit
+                </button>
 
-            <div className="mt-2 flex justify-between text-sm">
-              <span>💰 {product.price ?? "—"}</span>
-              <span>📦 {product.quantity ?? 0}</span>
+                <button
+                  onClick={() => deleteProduct(product.id)}
+                  className="bg-red-500 text-white px-3 rounded-xl"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            {/* BUTTONS */}
-            <div className="mt-4 flex gap-2">
-
-              <button
-                onClick={() => setEditing(product)}
-                className="flex-1 bg-black text-white rounded-xl py-2"
-              >
-                Edit
-              </button>
-
-              <button
-                onClick={() => deleteProduct(product.id)}
-                className="bg-red-500 text-white px-3 rounded-xl"
-              >
-                Delete
-              </button>
-
-            </div>
-          </div>
-        ))}
-
-      </div>
-
-      {/* ✏️ MODAL */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-2xl rounded-3xl p-6">
-
             <h2 className="text-xl font-bold mb-4">
               Edit Product
             </h2>
 
             <input
               className="w-full border p-3 rounded-xl mb-2"
-              value={editing.name}
+              value={editing.name || ""}
               onChange={(e) =>
                 setEditing({ ...editing, name: e.target.value })
               }
@@ -154,7 +148,7 @@ export default function ProductsManager({
 
             <input
               className="w-full border p-3 rounded-xl mb-2"
-              value={editing.barcode}
+              value={editing.barcode || ""}
               onChange={(e) =>
                 setEditing({ ...editing, barcode: e.target.value })
               }
@@ -165,7 +159,10 @@ export default function ProductsManager({
               type="number"
               value={editing.price || ""}
               onChange={(e) =>
-                setEditing({ ...editing, price: Number(e.target.value) })
+                setEditing({
+                  ...editing,
+                  price: Number(e.target.value),
+                })
               }
             />
 
@@ -174,7 +171,10 @@ export default function ProductsManager({
               type="number"
               value={editing.quantity || 0}
               onChange={(e) =>
-                setEditing({ ...editing, quantity: Number(e.target.value) })
+                setEditing({
+                  ...editing,
+                  quantity: Number(e.target.value),
+                })
               }
             />
 
@@ -190,7 +190,6 @@ export default function ProductsManager({
             />
 
             <div className="flex justify-end gap-2 mt-4">
-
               <button
                 onClick={() => setEditing(null)}
                 className="px-4 py-2 border rounded-xl"
@@ -205,14 +204,10 @@ export default function ProductsManager({
               >
                 {loading ? "Saving..." : "Save"}
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }
