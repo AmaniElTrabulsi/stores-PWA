@@ -25,41 +25,46 @@ export default function ProductsManager({
     );
   });
 
-  // 📷 CLEAN BARCODE SCANNER (FIXED)
+  // 📷 BACK CAMERA FIXED SCANNER
   useEffect(() => {
     if (!scannerOpen) return;
 
     let scanner: any;
 
-    const startScanner = async () => {
+    const start = async () => {
       const { Html5Qrcode } = await import("html5-qrcode");
 
       scanner = new Html5Qrcode("reader");
 
       const cameras = await Html5Qrcode.getCameras();
-      const cameraId = cameras?.[0]?.id;
+
+      // 🔥 pick BACK camera (environment)
+      const backCamera =
+        cameras.find((c) =>
+          c.label.toLowerCase().includes("back") ||
+          c.label.toLowerCase().includes("rear") ||
+          c.label.toLowerCase().includes("environment")
+        ) || cameras[0];
 
       await scanner.start(
-        cameraId,
+        backCamera.id,
         {
           fps: 10,
           qrbox: { width: 280, height: 120 },
         },
         (decodedText: string) => {
-          const cleanCode = decodedText.trim();
+          const clean = decodedText.trim();
 
           const product = products.find(
-            (p) => String(p.barcode).trim() === cleanCode
+            (p) => String(p.barcode).trim() === clean
           );
+
+          setQuery(clean);
 
           if (product) {
             setFoundId(product.id);
+            setTimeout(() => setFoundId(null), 2000);
           }
-
-          // 🔥 auto-fill search so it "finds" instantly
-          setQuery(cleanCode);
-
-          setTimeout(() => setFoundId(null), 2000);
 
           scanner.stop();
           setScannerOpen(false);
@@ -68,12 +73,10 @@ export default function ProductsManager({
       );
     };
 
-    startScanner();
+    start();
 
     return () => {
-      if (scanner) {
-        scanner.stop().catch(() => {});
-      }
+      if (scanner) scanner.stop().catch(() => {});
     };
   }, [scannerOpen, products]);
 
@@ -94,7 +97,6 @@ export default function ProductsManager({
         barcode: editing.barcode,
         price: editing.price,
         quantity: editing.quantity,
-        description: editing.description,
       })
       .eq("id", editing.id);
 
@@ -106,11 +108,11 @@ export default function ProductsManager({
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6 rounded-3xl">
 
-      {/* SEARCH + SCAN */}
+      {/* SEARCH */}
       <div className="mb-6 space-y-3">
         <input
           className="w-full px-4 py-3 rounded-2xl border bg-white"
-          placeholder="Search products or scan barcode..."
+          placeholder="Search or scan barcode..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -123,59 +125,60 @@ export default function ProductsManager({
         </button>
       </div>
 
-      {/* SCANNER UI */}
+      {/* SCANNER */}
       {scannerOpen && (
-        <div className="mb-6 rounded-3xl overflow-hidden border bg-black relative">
+        <div className="mb-6 rounded-2xl overflow-hidden border bg-black relative">
 
-          <div className="absolute top-2 left-2 z-10 text-white text-sm bg-black/60 px-3 py-1 rounded-full">
-            📷 Align barcode inside box
+          <div className="absolute top-2 left-2 z-10 text-white text-xs bg-black/60 px-3 py-1 rounded-full">
+            Align barcode in frame
           </div>
 
           <div id="reader" className="w-full" />
 
           <button
             onClick={() => setScannerOpen(false)}
-            className="absolute bottom-3 left-3 right-3 bg-white text-black py-2 rounded-xl font-medium"
+            className="absolute bottom-3 left-3 right-3 bg-white text-black py-2 rounded-xl"
           >
             Close Scanner
           </button>
         </div>
       )}
 
-      {/* PRODUCTS LIST (ROW STYLE) */}
+      {/* PRODUCTS LIST (FIXED ROW LAYOUT) */}
       <div className="flex flex-col gap-3">
 
         {filtered.map((product) => (
           <div
             key={product.id}
-            className={`bg-white border rounded-2xl p-4 flex items-center justify-between gap-4 transition
+            className={`bg-white border rounded-2xl p-4 flex items-center gap-4
               ${foundId === product.id ? "ring-4 ring-pink-400" : ""}
             `}
           >
 
-            {/* NAME + BARCODE */}
-            <div className="flex flex-col min-w-[200px]">
-              <span className="font-semibold text-gray-900">
+            {/* NAME */}
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="font-semibold text-gray-900 truncate">
                 {product.name}
               </span>
 
-              <span className="text-xs text-gray-500">
-                Barcode: {product.barcode || "—"}
+              <span className="text-xs text-gray-500 truncate">
+                {product.barcode || "No barcode"}
               </span>
             </div>
 
             {/* PRICE */}
-            <div className="text-sm font-medium text-gray-700 min-w-[80px]">
+            <div className="text-sm text-gray-700 whitespace-nowrap">
               💰 {product.price ?? 0}
             </div>
 
             {/* STOCK */}
-            <div className="text-sm text-gray-600 min-w-[80px]">
+            <div className="text-sm text-gray-600 whitespace-nowrap">
               📦 {product.quantity ?? 0}
             </div>
 
-            {/* ACTIONS */}
-            <div className="flex gap-2">
+            {/* ACTIONS (FIXED VISIBILITY) */}
+            <div className="flex gap-2 shrink-0">
+
               <button
                 onClick={() => setEditing(product)}
                 className="px-3 py-1 text-xs rounded-full bg-gray-100 hover:bg-gray-200"
@@ -189,6 +192,7 @@ export default function ProductsManager({
               >
                 🗑 Delete
               </button>
+
             </div>
 
           </div>
@@ -227,10 +231,7 @@ export default function ProductsManager({
               className="w-full border rounded-2xl p-3 mb-2"
               value={editing.price || 0}
               onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  price: Number(e.target.value),
-                })
+                setEditing({ ...editing, price: Number(e.target.value) })
               }
             />
 
@@ -239,10 +240,7 @@ export default function ProductsManager({
               className="w-full border rounded-2xl p-3 mb-2"
               value={editing.quantity || 0}
               onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  quantity: Number(e.target.value),
-                })
+                setEditing({ ...editing, quantity: Number(e.target.value) })
               }
             />
 
