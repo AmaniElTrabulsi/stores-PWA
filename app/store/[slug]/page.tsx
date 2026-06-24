@@ -60,23 +60,6 @@ export default async function StorePage({
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white p-6 border text-black">
-            <p className="text-sm text-black">
-              Barcode System
-            </p>
-            <p className="mt-2 font-semibold text-black">
-              Ready
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white p-6 border text-black">
-            <p className="text-sm text-black">
-              Inventory Status
-            </p>
-            <p className="mt-2 font-semibold text-black">
-              Active
-            </p>
-          </div>
 
         </div>
 

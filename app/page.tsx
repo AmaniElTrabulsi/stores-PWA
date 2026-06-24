@@ -41,19 +41,6 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Platform Status</p>
-            <p className="mt-2 text-lg font-semibold text-green-600">
-              Active
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Inventory System</p>
-            <p className="mt-2 text-lg font-semibold text-gray-900">
-              Ready
-            </p>
-          </div>
         </div>
 
         {/* Empty State */}

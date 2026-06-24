@@ -19,14 +19,13 @@ export default function ProductsManager({
 
   const filtered = products.filter((p) => {
     const q = query.toLowerCase();
-
     return (
       String(p.name || "").toLowerCase().includes(q) ||
       String(p.barcode || "").toLowerCase().includes(q)
     );
   });
 
-  // 📷 CAMERA SCANNER (client only safe)
+  // 📷 SCANNER FIXED
   useEffect(() => {
     if (!scannerOpen) return;
 
@@ -37,12 +36,16 @@ export default function ProductsManager({
 
       scanner = new Html5QrcodeScanner(
         "reader",
-        { fps: 10, qrbox: 250 },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 120 }, // better for barcodes
+          rememberLastUsedCamera: true,
+        },
         false
       );
 
       scanner.render(
-        (decodedText: string) => {
+        async (decodedText: string) => {
           const product = products.find(
             (p) => String(p.barcode) === String(decodedText)
           );
@@ -52,7 +55,10 @@ export default function ProductsManager({
             setTimeout(() => setFoundId(null), 2000);
           }
 
-          scanner.clear();
+          try {
+            await scanner.clear();
+          } catch {}
+
           setScannerOpen(false);
         },
         () => {}
@@ -99,7 +105,6 @@ export default function ProductsManager({
 
       {/* SEARCH + SCAN */}
       <div className="mb-6 space-y-3">
-
         <input
           className="w-full px-4 py-3 rounded-2xl border bg-white"
           placeholder="Search products..."
@@ -113,7 +118,6 @@ export default function ProductsManager({
         >
           📷 Scan Barcode
         </button>
-
       </div>
 
       {/* CAMERA */}
@@ -123,6 +127,7 @@ export default function ProductsManager({
             id="reader"
             className="w-full rounded-3xl overflow-hidden"
           />
+
           <button
             onClick={() => setScannerOpen(false)}
             className="mt-3 w-full py-2 rounded-xl border"
@@ -132,39 +137,35 @@ export default function ProductsManager({
         </div>
       )}
 
-      {/* PRODUCTS GRID */}
-      <div className="grid grid-cols-2 gap-6">
+      {/* PRODUCTS (ROW LIST) */}
+      <div className="flex flex-col gap-4">
 
         {filtered.map((product) => (
           <div
             key={product.id}
-            className={`bg-white border rounded-3xl p-5 flex flex-col justify-between transition-all duration-300
-              ${foundId === product.id ? "ring-4 ring-pink-400 scale-[1.02]" : ""}
+            className={`bg-white border rounded-3xl p-5 flex items-center justify-between transition-all duration-300
+              ${foundId === product.id ? "ring-4 ring-pink-400 scale-[1.01]" : ""}
             `}
           >
 
-            {/* TOP */}
-            <div className="space-y-1">
-              <h2 className="font-bold text-lg truncate">
+            {/* LEFT */}
+            <div className="flex flex-col">
+              <h2 className="font-bold text-lg">
                 {product.name}
               </h2>
 
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-gray-500">
                 🔖 {product.barcode || "No barcode"}
               </p>
             </div>
 
-            {/* PRICE + STOCK */}
-            <div className="mt-4 bg-gray-50 rounded-2xl p-3 text-sm">
-              <div className="flex justify-between">
-                <span>💰 {product.price ?? "—"}</span>
-                <span>📦 {product.quantity ?? 0}</span>
-              </div>
+            {/* MIDDLE */}
+            <div className="text-sm text-gray-700">
+              💰 {product.price ?? "—"} | 📦 {product.quantity ?? 0}
             </div>
 
             {/* ACTIONS */}
-            <div className="mt-4 flex justify-between">
-
+            <div className="flex gap-2">
               <button
                 onClick={() => setEditing(product)}
                 className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
@@ -178,7 +179,6 @@ export default function ProductsManager({
               >
                 🗑 Delete
               </button>
-
             </div>
 
           </div>
