@@ -1,70 +1,35 @@
 import { supabase } from "@/lib/supabase";
-import ProductsManager from "@/components/ProductsManager";
+import ProductManager from "./ProductManager";
 
-export default async function ProductsPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug: rawSlug } = await params;
-
-  const slug = decodeURIComponent(rawSlug).trim().toLowerCase();
-
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*")
-    .ilike("slug", slug)
-    .maybeSingle();
-
-  if (!store) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold">Store not found</h1>
-        </div>
-      </div>
-    );
-  }
-
+export default async function ProductsPage() {
   const { data: products } = await supabase
     .from("products")
     .select("*")
-    .eq("store_id", store.id)
     .order("created_at", { ascending: false });
 
   return (
-    <main className="min-h-screen bg-[#f6f7fb] text-black">
+    <div className="min-h-screen w-full bg-gray-50">
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      {/* FULL WIDTH CONTAINER */}
+      <div className="w-full max-w-7xl mx-auto px-6 py-10">
 
         {/* HEADER */}
-        <div className="flex items-end justify-between mb-10">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-3xl font-bold">
+            Products
+          </h1>
 
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">
-              {store.name}
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Products dashboard
-            </p>
+          <div className="text-sm text-gray-500">
+            Total: {products?.length || 0}
           </div>
-
-          <div className="bg-white border rounded-2xl px-5 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">Total Products</p>
-            <p className="text-2xl font-bold">
-              {products?.length || 0}
-            </p>
-          </div>
-
         </div>
 
-        {/* CONTENT */}
-        <div className="bg-white border rounded-3xl shadow-sm p-6">
-          <ProductsManager products={products || []} />
+        {/* TABLE */}
+        <div className="w-full">
+          <ProductManager products={products || []} />
         </div>
 
       </div>
-
-    </main>
+    </div>
   );
 }
