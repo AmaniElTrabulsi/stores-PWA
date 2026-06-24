@@ -25,40 +25,43 @@ export default function ProductsManager({
     );
   });
 
-  // 📷 SCANNER FIXED
+  // 📷 CLEAN BARCODE SCANNER (FIXED)
   useEffect(() => {
     if (!scannerOpen) return;
 
     let scanner: any;
 
     const startScanner = async () => {
-      const { Html5QrcodeScanner } = await import("html5-qrcode");
+      const { Html5Qrcode } = await import("html5-qrcode");
 
-      scanner = new Html5QrcodeScanner(
-        "reader",
+      scanner = new Html5Qrcode("reader");
+
+      const cameras = await Html5Qrcode.getCameras();
+      const cameraId = cameras?.[0]?.id;
+
+      await scanner.start(
+        cameraId,
         {
           fps: 10,
-          qrbox: { width: 250, height: 120 }, // better for barcodes
-          rememberLastUsedCamera: true,
+          qrbox: { width: 280, height: 120 },
         },
-        false
-      );
+        (decodedText: string) => {
+          const cleanCode = decodedText.trim();
 
-      scanner.render(
-        async (decodedText: string) => {
           const product = products.find(
-            (p) => String(p.barcode) === String(decodedText)
+            (p) => String(p.barcode).trim() === cleanCode
           );
 
           if (product) {
             setFoundId(product.id);
-            setTimeout(() => setFoundId(null), 2000);
           }
 
-          try {
-            await scanner.clear();
-          } catch {}
+          // 🔥 auto-fill search so it "finds" instantly
+          setQuery(cleanCode);
 
+          setTimeout(() => setFoundId(null), 2000);
+
+          scanner.stop();
           setScannerOpen(false);
         },
         () => {}
@@ -69,7 +72,7 @@ export default function ProductsManager({
 
     return () => {
       if (scanner) {
-        scanner.clear().catch(() => {});
+        scanner.stop().catch(() => {});
       }
     };
   }, [scannerOpen, products]);
@@ -107,7 +110,7 @@ export default function ProductsManager({
       <div className="mb-6 space-y-3">
         <input
           className="w-full px-4 py-3 rounded-2xl border bg-white"
-          placeholder="Search products..."
+          placeholder="Search products or scan barcode..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -120,62 +123,69 @@ export default function ProductsManager({
         </button>
       </div>
 
-      {/* CAMERA */}
+      {/* SCANNER UI */}
       {scannerOpen && (
-        <div className="mb-6">
-          <div
-            id="reader"
-            className="w-full rounded-3xl overflow-hidden"
-          />
+        <div className="mb-6 rounded-3xl overflow-hidden border bg-black relative">
+
+          <div className="absolute top-2 left-2 z-10 text-white text-sm bg-black/60 px-3 py-1 rounded-full">
+            📷 Align barcode inside box
+          </div>
+
+          <div id="reader" className="w-full" />
 
           <button
             onClick={() => setScannerOpen(false)}
-            className="mt-3 w-full py-2 rounded-xl border"
+            className="absolute bottom-3 left-3 right-3 bg-white text-black py-2 rounded-xl font-medium"
           >
             Close Scanner
           </button>
         </div>
       )}
 
-      {/* PRODUCTS (ROW LIST) */}
-      <div className="flex flex-col gap-4">
+      {/* PRODUCTS LIST (ROW STYLE) */}
+      <div className="flex flex-col gap-3">
 
         {filtered.map((product) => (
           <div
             key={product.id}
-            className={`bg-white border rounded-3xl p-5 flex items-center justify-between transition-all duration-300
-              ${foundId === product.id ? "ring-4 ring-pink-400 scale-[1.01]" : ""}
+            className={`bg-white border rounded-2xl p-4 flex items-center justify-between gap-4 transition
+              ${foundId === product.id ? "ring-4 ring-pink-400" : ""}
             `}
           >
 
-            {/* LEFT */}
-            <div className="flex flex-col">
-              <h2 className="font-bold text-lg">
+            {/* NAME + BARCODE */}
+            <div className="flex flex-col min-w-[200px]">
+              <span className="font-semibold text-gray-900">
                 {product.name}
-              </h2>
+              </span>
 
-              <p className="text-xs text-gray-500">
-                🔖 {product.barcode || "No barcode"}
-              </p>
+              <span className="text-xs text-gray-500">
+                Barcode: {product.barcode || "—"}
+              </span>
             </div>
 
-            {/* MIDDLE */}
-            <div className="text-sm text-gray-700">
-              💰 {product.price ?? "—"} | 📦 {product.quantity ?? 0}
+            {/* PRICE */}
+            <div className="text-sm font-medium text-gray-700 min-w-[80px]">
+              💰 {product.price ?? 0}
+            </div>
+
+            {/* STOCK */}
+            <div className="text-sm text-gray-600 min-w-[80px]">
+              📦 {product.quantity ?? 0}
             </div>
 
             {/* ACTIONS */}
             <div className="flex gap-2">
               <button
                 onClick={() => setEditing(product)}
-                className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                className="px-3 py-1 text-xs rounded-full bg-gray-100 hover:bg-gray-200"
               >
                 ✏️ Edit
               </button>
 
               <button
                 onClick={() => deleteProduct(product.id)}
-                className="text-xs px-3 py-1.5 rounded-full text-red-500 bg-red-50 hover:bg-red-100 transition"
+                className="px-3 py-1 text-xs rounded-full bg-red-50 text-red-600 hover:bg-red-100"
               >
                 🗑 Delete
               </button>
