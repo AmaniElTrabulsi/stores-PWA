@@ -19,7 +19,7 @@ export default function ProductsManager({
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // 🔍 FILTER (name OR barcode)
+  // 🔍 SEARCH (name OR barcode)
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
 
@@ -31,68 +31,83 @@ export default function ProductsManager({
     });
   }, [products, query]);
 
-  // 📷 SCANNER (FORCED BACK CAMERA)
+  // 📷 SCANNER (FIXED + BACK CAMERA)
   useEffect(() => {
     if (!scannerOpen) return;
 
-    const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode: Html5Qrcode | null = null;
 
-    Html5Qrcode.getCameras()
-      .then((devices) => {
+    const startScanner = async () => {
+      try {
+        html5QrCode = new Html5Qrcode("reader");
+
+        const devices = await Html5Qrcode.getCameras();
+
+        if (!devices?.length) {
+          console.error("No camera found");
+          return;
+        }
+
+        // 📷 force back camera (fallback to first)
         const backCamera =
           devices.find((d) =>
             d.label.toLowerCase().includes("back")
           )?.id || devices[0].id;
 
-        html5QrCode
-          .start(
-            backCamera,
-            {
-              fps: 10,
-              qrbox: 250,
-            },
-            (decodedText) => {
-              console.log("SCAN:", decodedText);
+        await html5QrCode.start(
+          backCamera,
+          {
+            fps: 10,
+            qrbox: 250,
+          },
+          (decodedText: string) => {
+            console.log("SCAN:", decodedText);
 
-              // 🔥 FIND PRODUCT
-              const product = products.find(
-                (p) =>
-                  String(p.barcode) === String(decodedText)
-              );
+            const product = products.find(
+              (p) =>
+                String(p.barcode) === String(decodedText)
+            );
 
-              if (product) {
-                setQuery(decodedText); // ✅ FILTER
+            if (product) {
+              setQuery(decodedText);
+              setFoundId(product.id);
 
-                setFoundId(product.id); // highlight
-
-                // 📍 AUTO SCROLL
-                setTimeout(() => {
-                  rowRefs.current[product.id]?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                  });
-                }, 200);
-              }
-
-              html5QrCode.stop();
-              setScannerOpen(false);
+              setTimeout(() => {
+                rowRefs.current[product.id]?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }, 200);
             }
-          )
-          .catch((err) => {
-            console.error("Camera error:", err);
-          });
-      });
+
+            html5QrCode?.stop();
+            setScannerOpen(false);
+          },
+          () => {
+            // ignore scan errors
+          }
+        );
+      } catch (err) {
+        console.error("Scanner error:", err);
+      }
+    };
+
+    startScanner();
 
     return () => {
-      html5QrCode.stop().catch(() => {});
+      if (html5QrCode) {
+        html5QrCode.stop().catch(() => {});
+      }
     };
   }, [scannerOpen, products]);
 
+  // 🗑 DELETE
   const deleteProduct = async (id: string) => {
     await supabase.from("products").delete().eq("id", id);
     router.refresh();
   };
 
+  // ✏️ SAVE
   const saveProduct = async () => {
     if (!editing) return;
 
@@ -116,7 +131,7 @@ export default function ProductsManager({
       <div className="flex gap-2">
         <input
           className="w-full border rounded-xl p-3"
-          placeholder="Search name or barcode..."
+          placeholder="Search by name or barcode..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -129,7 +144,7 @@ export default function ProductsManager({
         </button>
       </div>
 
-      {/* CAMERA */}
+      {/* SCANNER */}
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
           <div
@@ -214,8 +229,8 @@ export default function ProductsManager({
             />
 
             <input
-              type="number"
               className="w-full border p-2 mb-4 rounded"
+              type="number"
               value={editing.quantity || 0}
               onChange={(e) =>
                 setEditing({
