@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -10,8 +10,22 @@ export default function ProductsManager({
   products: any[];
 }) {
   const router = useRouter();
+
+  const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [foundId, setFoundId] = useState<string | null>(null);
+
+  // 🔍 SEARCH by name OR barcode
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+
+    return products?.filter((p) => {
+      return (
+        p.name?.toLowerCase().includes(q) ||
+        String(p.barcode || "").toLowerCase().includes(q)
+      );
+    });
+  }, [products, query]);
 
   const deleteProduct = async (id: string) => {
     await supabase.from("products").delete().eq("id", id);
@@ -21,75 +35,92 @@ export default function ProductsManager({
   const saveProduct = async () => {
     if (!editing) return;
 
-    setLoading(true);
-
     await supabase
       .from("products")
       .update({
         name: editing.name,
         barcode: editing.barcode,
-        quantity: editing.quantity, // STOCK
+        quantity: editing.quantity,
       })
       .eq("id", editing.id);
 
-    setLoading(false);
     setEditing(null);
     router.refresh();
   };
 
   return (
-    <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+    <div className="space-y-4">
 
-      {/* HEADER */}
-      <div className="grid grid-cols-4 p-4 bg-gray-50 text-sm font-semibold text-gray-600">
-        <div>Product</div>
-        <div>Barcode</div>
-        <div>Stock</div>
-        <div>Actions</div>
+      {/* 🔍 SEARCH BAR */}
+      <div className="flex gap-2">
+        <input
+          className="w-full border rounded-xl p-3"
+          placeholder="Search by product name or barcode..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+
+        <button
+          onClick={() => {
+            // hook this to your scanner later
+            alert("Connect scanner here");
+          }}
+          className="px-4 rounded-xl bg-black text-white"
+        >
+          Scan
+        </button>
       </div>
 
-      {/* ROWS */}
-      {products?.map((p) => (
-        <div
-          key={p.id}
-          className="grid grid-cols-4 p-4 border-t items-center"
-        >
+      {/* TABLE */}
+      <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
 
-          {/* NAME */}
-          <div className="font-medium truncate">
-            {p.name}
-          </div>
-
-          {/* BARCODE */}
-          <div className="text-sm text-gray-600 truncate">
-            {p.barcode || "—"}
-          </div>
-
-          {/* STOCK */}
-          <div className="text-sm font-semibold">
-            {p.quantity ?? 0}
-          </div>
-
-          {/* ACTIONS */}
-          <div className="flex gap-2">
-
-            <button
-              onClick={() => setEditing(p)}
-              className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
-            >
-              Edit
-            </button>
-
-            <button
-              onClick={() => deleteProduct(p.id)}
-              className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
-            >
-              Delete
-            </button>
-
-          </div>
+        {/* HEADER */}
+        <div className="grid grid-cols-3 p-4 bg-gray-50 text-sm font-semibold text-gray-600">
+          <div>Product</div>
+          <div>Stock</div>
+          <div>Actions</div>
         </div>
-      ))}
+
+        {/* ROWS */}
+        {filtered?.map((p) => (
+          <div
+            key={p.id}
+            className={`grid grid-cols-3 p-4 border-t items-center transition ${
+              foundId === p.id ? "bg-green-50" : ""
+            }`}
+          >
+
+            {/* NAME (FULL, NO TRUNCATE) */}
+            <div className="font-medium">
+              {p.name}
+            </div>
+
+            {/* STOCK */}
+            <div className="text-sm font-semibold">
+              {p.quantity ?? 0}
+            </div>
+
+            {/* ACTIONS */}
+            <div className="flex gap-2">
+
+              <button
+                onClick={() => setEditing(p)}
+                className="px-3 py-1 text-xs bg-gray-100 rounded"
+              >
+                Edit
+              </button>
+
+              <button
+                onClick={() => deleteProduct(p.id)}
+                className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded"
+              >
+                Delete
+              </button>
+
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* EDIT MODAL */}
       {editing && (
@@ -106,14 +137,6 @@ export default function ProductsManager({
               value={editing.name || ""}
               onChange={(e) =>
                 setEditing({ ...editing, name: e.target.value })
-              }
-            />
-
-            <input
-              className="w-full border p-2 mb-2 rounded"
-              value={editing.barcode || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, barcode: e.target.value })
               }
             />
 
@@ -140,10 +163,9 @@ export default function ProductsManager({
 
               <button
                 onClick={saveProduct}
-                disabled={loading}
                 className="px-4 py-2 bg-black text-white rounded"
               >
-                {loading ? "Saving..." : "Save"}
+                Save
               </button>
 
             </div>
@@ -151,6 +173,7 @@ export default function ProductsManager({
           </div>
         </div>
       )}
+
     </div>
   );
 }
