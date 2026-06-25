@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -13,9 +14,12 @@ export default function ProductsManager({
 
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [foundId, setFoundId] = useState<string | null>(null);
 
-  // 🔍 SEARCH by name OR barcode
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // 🔍 FILTER (name OR barcode)
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
 
@@ -26,6 +30,63 @@ export default function ProductsManager({
       );
     });
   }, [products, query]);
+
+  // 📷 SCANNER (FORCED BACK CAMERA)
+  useEffect(() => {
+    if (!scannerOpen) return;
+
+    const html5QrCode = new Html5Qrcode("reader");
+
+    Html5Qrcode.getCameras()
+      .then((devices) => {
+        const backCamera =
+          devices.find((d) =>
+            d.label.toLowerCase().includes("back")
+          )?.id || devices[0].id;
+
+        html5QrCode
+          .start(
+            backCamera,
+            {
+              fps: 10,
+              qrbox: 250,
+            },
+            (decodedText) => {
+              console.log("SCAN:", decodedText);
+
+              // 🔥 FIND PRODUCT
+              const product = products.find(
+                (p) =>
+                  String(p.barcode) === String(decodedText)
+              );
+
+              if (product) {
+                setQuery(decodedText); // ✅ FILTER
+
+                setFoundId(product.id); // highlight
+
+                // 📍 AUTO SCROLL
+                setTimeout(() => {
+                  rowRefs.current[product.id]?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+                }, 200);
+              }
+
+              html5QrCode.stop();
+              setScannerOpen(false);
+            }
+          )
+          .catch((err) => {
+            console.error("Camera error:", err);
+          });
+      });
+
+    return () => {
+      html5QrCode.stop().catch(() => {});
+    };
+  }, [scannerOpen, products]);
 
   const deleteProduct = async (id: string) => {
     await supabase.from("products").delete().eq("id", id);
@@ -51,31 +112,44 @@ export default function ProductsManager({
   return (
     <div className="space-y-4">
 
-      {/* 🔍 SEARCH BAR */}
+      {/* SEARCH + SCAN */}
       <div className="flex gap-2">
         <input
           className="w-full border rounded-xl p-3"
-          placeholder="Search by product name or barcode..."
+          placeholder="Search name or barcode..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
 
         <button
-          onClick={() => {
-            // hook this to your scanner later
-            alert("Connect scanner here");
-          }}
-          className="px-4 rounded-xl bg-black text-white"
+          onClick={() => setScannerOpen(true)}
+          className="px-4 bg-black text-white rounded-xl"
         >
           Scan
         </button>
       </div>
 
+      {/* CAMERA */}
+      {scannerOpen && (
+        <div className="p-4 border rounded-xl">
+          <div
+            id="reader"
+            className="w-full rounded-xl overflow-hidden"
+          />
+          <button
+            className="mt-2 w-full border rounded-xl p-2"
+            onClick={() => setScannerOpen(false)}
+          >
+            Close Scanner
+          </button>
+        </div>
+      )}
+
       {/* TABLE */}
-      <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white border rounded-2xl overflow-hidden">
 
         {/* HEADER */}
-        <div className="grid grid-cols-3 p-4 bg-gray-50 text-sm font-semibold text-gray-600">
+        <div className="grid grid-cols-3 p-4 bg-gray-50 font-semibold text-sm">
           <div>Product</div>
           <div>Stock</div>
           <div>Actions</div>
@@ -85,20 +159,19 @@ export default function ProductsManager({
         {filtered?.map((p) => (
           <div
             key={p.id}
-            className={`grid grid-cols-3 p-4 border-t items-center transition ${
-              foundId === p.id ? "bg-green-50" : ""
+            ref={(el) => (rowRefs.current[p.id] = el)}
+            className={`grid grid-cols-3 p-4 border-t transition ${
+              foundId === p.id ? "bg-green-100" : ""
             }`}
           >
 
-            {/* NAME (FULL, NO TRUNCATE) */}
+            {/* NAME */}
             <div className="font-medium">
               {p.name}
             </div>
 
             {/* STOCK */}
-            <div className="text-sm font-semibold">
-              {p.quantity ?? 0}
-            </div>
+            <div>{p.quantity ?? 0}</div>
 
             {/* ACTIONS */}
             <div className="flex gap-2">
