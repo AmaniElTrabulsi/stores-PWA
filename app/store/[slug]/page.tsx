@@ -4,9 +4,9 @@ import Link from "next/link";
 export default async function StorePage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
+  const { slug } = params;
 
   const { data: store } = await supabase
     .from("stores")
@@ -16,10 +16,8 @@ export default async function StorePage({
 
   if (!store) {
     return (
-      <div className="p-10 text-black">
-        <h1 className="text-2xl font-bold text-black">
-          Store not found
-        </h1>
+      <div className="p-10">
+        <h1 className="text-2xl font-bold">Store not found</h1>
       </div>
     );
   }
@@ -30,65 +28,56 @@ export default async function StorePage({
     .eq("store_id", store.id);
 
   return (
-    <main className="min-h-screen bg-white text-black">
-      
+    <main className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="border-b bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6">
-          <h1 className="text-3xl font-bold text-black">
-            {store.name}
-          </h1>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <h1 className="text-3xl font-bold">{store.name}</h1>
 
-          <p className="mt-2 text-black">
+          <p className="mt-2 text-gray-500">
             Store Dashboard
           </p>
         </div>
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-6 py-8">
-
-        {/* Cards */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
-
-          <div className="rounded-2xl bg-white p-6 border text-black">
-            <p className="text-sm text-black">
+          <div className="rounded-2xl bg-white border p-6 shadow-sm">
+            <p className="text-sm text-gray-500">
               Products
             </p>
-            <p className="mt-2 text-3xl font-bold text-black">
+
+            <p className="mt-2 text-3xl font-bold">
               {productCount ?? 0}
             </p>
           </div>
-
-
         </div>
 
-        {/* Buttons */}
+        {/* Actions */}
         <div className="mt-8 flex flex-wrap gap-4">
-
           <Link
             href={`/store/${slug}/products`}
-            className="rounded-xl border px-5 py-3 text-black"
+            className="rounded-xl border bg-white px-5 py-3 hover:bg-gray-50"
           >
             View Products
           </Link>
 
           <Link
             href={`/store/${slug}/add-product`}
-            className="rounded-xl border px-5 py-3 text-black"
+            className="rounded-xl border bg-white px-5 py-3 hover:bg-gray-50"
           >
             Add Product
           </Link>
 
           <Link
             href={`/store/${slug}/settings`}
-            className="rounded-xl border px-5 py-3 text-black"
+            className="rounded-xl border bg-white px-5 py-3 hover:bg-gray-50"
           >
             Settings
           </Link>
-
         </div>
-
       </div>
     </main>
   );
