@@ -19,7 +19,7 @@ export default function ProductsManager({
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // 🔍 FILTER (name OR barcode)
+  // 🔍 SEARCH
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
 
@@ -31,18 +31,18 @@ export default function ProductsManager({
     });
   }, [products, query]);
 
-  // 📷 SCANNER (SAFE — NO NAVIGATION EVER)
+  // 📷 SCANNER (FULL SAFE FIX)
   useEffect(() => {
     if (!scannerOpen) return;
 
     let scanner: Html5Qrcode | null = null;
+    let running = false;
 
-    const start = async () => {
+    const startScanner = async () => {
       try {
         scanner = new Html5Qrcode("reader");
 
         const devices = await Html5Qrcode.getCameras();
-
         if (!devices?.length) return;
 
         const backCamera =
@@ -59,9 +59,9 @@ export default function ProductsManager({
           (decodedText: string) => {
             const clean = String(decodedText).trim();
 
-            console.log("SCAN RESULT:", clean);
+            console.log("SCANNED:", clean);
 
-            // 🚨 ONLY ACTION: fill search bar
+            // 🔥 ONLY ACTION = search input
             setQuery(clean);
 
             const product = (products || []).find(
@@ -79,20 +79,28 @@ export default function ProductsManager({
               }, 200);
             }
 
-            scanner?.stop();
+            // ✅ SAFE STOP (ONLY ONCE)
+            if (running) {
+              running = false;
+              scanner?.stop().catch(() => {});
+            }
+
             setScannerOpen(false);
           },
           () => {}
         );
+
+        running = true;
       } catch (err) {
         console.error("Scanner error:", err);
       }
     };
 
-    start();
+    startScanner();
 
     return () => {
-      if (scanner) {
+      if (scanner && running) {
+        running = false;
         scanner.stop().catch(() => {});
       }
     };
