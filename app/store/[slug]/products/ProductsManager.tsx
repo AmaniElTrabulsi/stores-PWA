@@ -23,7 +23,7 @@ export default function ProductsManager({
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
 
-    return products?.filter((p) => {
+    return (products || []).filter((p) => {
       return (
         p.name?.toLowerCase().includes(q) ||
         String(p.barcode || "").toLowerCase().includes(q)
@@ -31,7 +31,7 @@ export default function ProductsManager({
     });
   }, [products, query]);
 
-  // 📷 SCANNER (FIXED + BACK CAMERA)
+  // 📷 SCANNER (SAFE + BACK CAMERA)
   useEffect(() => {
     if (!scannerOpen) return;
 
@@ -45,7 +45,6 @@ export default function ProductsManager({
 
         if (!devices?.length) return;
 
-        // 📷 FORCE BACK CAMERA
         const backCamera =
           devices.find((d) =>
             d.label.toLowerCase().includes("back")
@@ -60,13 +59,23 @@ export default function ProductsManager({
           (decodedText: string) => {
             console.log("SCAN:", decodedText);
 
-            const product = products.find(
-              (p) =>
-                String(p.barcode) === String(decodedText)
+            // 🚨 HARD SAFETY: prevent URL navigation bugs
+            const cleanText = String(decodedText).trim();
+
+            if (
+              cleanText.startsWith("http") ||
+              cleanText.startsWith("www")
+            ) {
+              console.warn("Blocked URL scan:", cleanText);
+              return;
+            }
+
+            const product = (products || []).find(
+              (p) => String(p.barcode) === cleanText
             );
 
             if (product) {
-              setQuery(decodedText);
+              setQuery(cleanText);
               setFoundId(product.id);
 
               setTimeout(() => {
@@ -75,6 +84,8 @@ export default function ProductsManager({
                   block: "center",
                 });
               }, 200);
+            } else {
+              console.warn("Product not found for barcode:", cleanText);
             }
 
             html5QrCode?.stop();
@@ -85,7 +96,7 @@ export default function ProductsManager({
           }
         );
       } catch (err) {
-        console.error(err);
+        console.error("Scanner error:", err);
       }
     };
 
@@ -144,8 +155,10 @@ export default function ProductsManager({
       {/* SCANNER */}
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
-          <div id="reader" className="w-full rounded-xl" />
-
+          <div
+            id="reader"
+            className="w-full rounded-xl overflow-hidden"
+          />
           <button
             onClick={() => setScannerOpen(false)}
             className="mt-2 w-full border rounded-xl p-2"
