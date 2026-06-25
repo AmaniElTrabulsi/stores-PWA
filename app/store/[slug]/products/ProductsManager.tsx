@@ -10,10 +10,18 @@ export default function ProductsManager({
   products?: any[];
 }) {
   const router = useRouter();
-  const [editing, setEditing] = useState<any | null>(null);
 
-  const deleteProduct = async (id: string) => {
-    await supabase.from("products").delete().eq("id", id);
+  const [editing, setEditing] =
+    useState<any | null>(null);
+
+  const deleteProduct = async (
+    id: string
+  ) => {
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", id);
+
     router.refresh();
   };
 
@@ -35,76 +43,104 @@ export default function ProductsManager({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow overflow-hidden">
+    <>
+      <div className="bg-white rounded-2xl shadow overflow-hidden">
 
-      <table className="w-full">
-        <thead>
-          <tr className="bg-gray-100 text-left">
-            <th className="p-4">Product</th>
-            <th className="p-4">Barcode</th>
-            <th className="p-4">Price</th>
-            <th className="p-4">Stock</th>
-            <th className="p-4">Actions</th>
-          </tr>
-        </thead>
+        <table className="w-full">
 
-        <tbody>
-          {(products ?? []).map((product) => (
-            <tr
-              key={product.id}
-              className="border-t hover:bg-gray-50"
-            >
-              <td className="p-4 font-medium">
-                {product.name}
-              </td>
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="text-left p-4">
+                Product
+              </th>
 
-              <td className="p-4 text-gray-600">
-                {product.barcode || "—"}
-              </td>
+              <th className="text-left p-4">
+                Barcode
+              </th>
 
-              <td className="p-4">
-                ${product.price ?? 0}
-              </td>
+              <th className="text-left p-4">
+                Price
+              </th>
 
-              <td className="p-4">
-                {product.quantity ?? 0}
-              </td>
+              <th className="text-left p-4">
+                Stock
+              </th>
 
-              <td className="p-4">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setEditing(product)}
-                    className="px-3 py-1 rounded bg-blue-100 text-blue-700"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className="px-3 py-1 rounded bg-red-100 text-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
+              <th className="text-left p-4">
+                Actions
+              </th>
             </tr>
-          ))}
+          </thead>
 
-          {products.length === 0 && (
-            <tr>
-              <td
-                colSpan={5}
-                className="text-center p-10 text-gray-500"
+          <tbody>
+
+            {products.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="text-center p-10 text-gray-500"
+                >
+                  No products found
+                </td>
+              </tr>
+            )}
+
+            {products.map((product) => (
+              <tr
+                key={product.id}
+                className="border-t hover:bg-gray-50"
               >
-                No products found
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+                <td className="p-4 font-medium">
+                  {product.name}
+                </td>
+
+                <td className="p-4">
+                  {product.barcode || "—"}
+                </td>
+
+                <td className="p-4">
+                  ${product.price ?? 0}
+                </td>
+
+                <td className="p-4">
+                  {product.quantity ?? 0}
+                </td>
+
+                <td className="p-4">
+                  <div className="flex gap-2">
+
+                    <button
+                      onClick={() =>
+                        setEditing(product)
+                      }
+                      className="px-3 py-1 rounded bg-blue-100 text-blue-700"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        deleteProduct(product.id)
+                      }
+                      className="px-3 py-1 rounded bg-red-100 text-red-700"
+                    >
+                      Delete
+                    </button>
+
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
 
             <h2 className="text-xl font-bold mb-4">
@@ -140,7 +176,9 @@ export default function ProductsManager({
               onChange={(e) =>
                 setEditing({
                   ...editing,
-                  price: Number(e.target.value),
+                  price: Number(
+                    e.target.value
+                  ),
                 })
               }
             />
@@ -152,14 +190,19 @@ export default function ProductsManager({
               onChange={(e) =>
                 setEditing({
                   ...editing,
-                  quantity: Number(e.target.value),
+                  quantity: Number(
+                    e.target.value
+                  ),
                 })
               }
             />
 
             <div className="flex justify-end gap-2">
+
               <button
-                onClick={() => setEditing(null)}
+                onClick={() =>
+                  setEditing(null)
+                }
                 className="px-4 py-2 border rounded"
               >
                 Cancel
@@ -171,11 +214,13 @@ export default function ProductsManager({
               >
                 Save
               </button>
+
             </div>
 
           </div>
+
         </div>
       )}
-    </div>
+    </>
   );
 }
