@@ -14,6 +14,7 @@ export default function ProductsManager({
 
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [foundId, setFoundId] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export default function ProductsManager({
     });
   }, [products, query]);
 
-  // 📷 SCANNER (FULL SAFE FIX)
+  // 📷 SCANNER (UNCHANGED, SAFE)
   useEffect(() => {
     if (!scannerOpen) return;
 
@@ -52,16 +53,10 @@ export default function ProductsManager({
 
         await scanner.start(
           backCamera,
-          {
-            fps: 10,
-            qrbox: 250,
-          },
+          { fps: 10, qrbox: 250 },
           (decodedText: string) => {
             const clean = String(decodedText).trim();
 
-            console.log("SCANNED:", clean);
-
-            // 🔥 ONLY ACTION = search input
             setQuery(clean);
 
             const product = (products || []).find(
@@ -79,7 +74,6 @@ export default function ProductsManager({
               }, 200);
             }
 
-            // ✅ SAFE STOP (ONLY ONCE)
             if (running) {
               running = false;
               scanner?.stop().catch(() => {});
@@ -112,7 +106,7 @@ export default function ProductsManager({
     router.refresh();
   };
 
-  // ✏️ SAVE
+  // 💾 SAVE FULL PRODUCT
   const saveProduct = async () => {
     if (!editing) return;
 
@@ -122,10 +116,13 @@ export default function ProductsManager({
         name: editing.name,
         barcode: editing.barcode,
         quantity: editing.quantity,
+        price: editing.price,
+        description: editing.description,
       })
       .eq("id", editing.id);
 
     setEditing(null);
+    setSelected(null);
     router.refresh();
   };
 
@@ -153,7 +150,6 @@ export default function ProductsManager({
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
           <div id="reader" className="w-full" />
-
           <button
             onClick={() => setScannerOpen(false)}
             className="mt-2 w-full border rounded-xl p-2"
@@ -166,29 +162,34 @@ export default function ProductsManager({
       {/* TABLE */}
       <div className="bg-white border rounded-2xl overflow-hidden">
 
-        {/* HEADER */}
         <div className="grid grid-cols-3 p-4 bg-gray-50 font-semibold text-sm">
           <div>Product</div>
           <div>Stock</div>
           <div>Actions</div>
         </div>
 
-        {/* ROWS */}
         {filtered?.map((p) => (
           <div
             key={p.id}
             ref={(el) => {
               rowRefs.current[p.id] = el;
             }}
-            className={`grid grid-cols-3 p-4 border-t transition ${
+            className={`grid grid-cols-3 p-4 border-t cursor-pointer transition ${
               foundId === p.id ? "bg-green-100" : ""
             }`}
           >
-            <div className="font-medium">{p.name}</div>
+
+            {/* CLICK → VIEW DETAILS */}
+            <div
+              className="font-medium"
+              onClick={() => setSelected(p)}
+            >
+              {p.name}
+            </div>
+
             <div>{p.quantity ?? 0}</div>
 
             <div className="flex gap-2">
-
               <button
                 onClick={() => setEditing(p)}
                 className="px-3 py-1 text-xs bg-gray-100 rounded"
@@ -202,43 +203,106 @@ export default function ProductsManager({
               >
                 Delete
               </button>
-
             </div>
           </div>
         ))}
       </div>
 
-      {/* EDIT MODAL */}
+      {/* 📦 VIEW MODAL */}
+      {selected && !editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+
+          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2">
+
+            <h2 className="text-xl font-bold">Product Details</h2>
+
+            <p><b>Name:</b> {selected.name}</p>
+            <p><b>Barcode:</b> {selected.barcode}</p>
+            <p><b>Price:</b> {selected.price}</p>
+            <p><b>Stock:</b> {selected.quantity}</p>
+            <p><b>Description:</b> {selected.description || "—"}</p>
+
+            <div className="flex justify-end gap-2 pt-3">
+
+              <button
+                onClick={() => setSelected(null)}
+                className="px-4 py-2 border rounded"
+              >
+                Close
+              </button>
+
+              <button
+                onClick={() => setEditing(selected)}
+                className="px-4 py-2 bg-black text-white rounded"
+              >
+                Edit
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ✏️ EDIT MODAL (FULL) */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
 
-          <div className="bg-white w-full max-w-md p-6 rounded-2xl">
+          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2">
 
-            <h2 className="text-lg font-bold mb-4">
-              Edit Product
-            </h2>
+            <h2 className="text-lg font-bold">Edit Product</h2>
 
             <input
-              className="w-full border p-2 mb-2 rounded"
+              className="w-full border p-2 rounded"
               value={editing.name || ""}
               onChange={(e) =>
                 setEditing({ ...editing, name: e.target.value })
               }
+              placeholder="Name"
+            />
+
+            <input
+              className="w-full border p-2 rounded"
+              value={editing.barcode || ""}
+              onChange={(e) =>
+                setEditing({ ...editing, barcode: e.target.value })
+              }
+              placeholder="Barcode"
             />
 
             <input
               type="number"
-              className="w-full border p-2 mb-4 rounded"
+              className="w-full border p-2 rounded"
+              value={editing.price || 0}
+              onChange={(e) =>
+                setEditing({ ...editing, price: Number(e.target.value) })
+              }
+              placeholder="Price"
+            />
+
+            <input
+              type="number"
+              className="w-full border p-2 rounded"
               value={editing.quantity || 0}
+              onChange={(e) =>
+                setEditing({ ...editing, quantity: Number(e.target.value) })
+              }
+              placeholder="Stock"
+            />
+
+            <textarea
+              className="w-full border p-2 rounded"
+              value={editing.description || ""}
               onChange={(e) =>
                 setEditing({
                   ...editing,
-                  quantity: Number(e.target.value),
+                  description: e.target.value,
                 })
               }
+              placeholder="Description"
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
 
               <button
                 onClick={() => setEditing(null)}
