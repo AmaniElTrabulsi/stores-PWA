@@ -43,12 +43,9 @@ export default function ProductsManager({
 
         const devices = await Html5Qrcode.getCameras();
 
-        if (!devices?.length) {
-          console.error("No camera found");
-          return;
-        }
+        if (!devices?.length) return;
 
-        // 📷 force back camera (fallback to first)
+        // 📷 FORCE BACK CAMERA
         const backCamera =
           devices.find((d) =>
             d.label.toLowerCase().includes("back")
@@ -88,7 +85,7 @@ export default function ProductsManager({
           }
         );
       } catch (err) {
-        console.error("Scanner error:", err);
+        console.error(err);
       }
     };
 
@@ -147,13 +144,11 @@ export default function ProductsManager({
       {/* SCANNER */}
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
-          <div
-            id="reader"
-            className="w-full rounded-xl overflow-hidden"
-          />
+          <div id="reader" className="w-full rounded-xl" />
+
           <button
-            className="mt-2 w-full border rounded-xl p-2"
             onClick={() => setScannerOpen(false)}
+            className="mt-2 w-full border rounded-xl p-2"
           >
             Close Scanner
           </button>
@@ -174,21 +169,20 @@ export default function ProductsManager({
         {filtered?.map((p) => (
           <div
             key={p.id}
-            ref={(el) => (rowRefs.current[p.id] = el)}
+            ref={(el) => {
+              rowRefs.current[p.id] = el;
+            }}
             className={`grid grid-cols-3 p-4 border-t transition ${
               foundId === p.id ? "bg-green-100" : ""
             }`}
           >
 
-            {/* NAME */}
             <div className="font-medium">
               {p.name}
             </div>
 
-            {/* STOCK */}
             <div>{p.quantity ?? 0}</div>
 
-            {/* ACTIONS */}
             <div className="flex gap-2">
 
               <button
@@ -229,8 +223,8 @@ export default function ProductsManager({
             />
 
             <input
-              className="w-full border p-2 mb-4 rounded"
               type="number"
+              className="w-full border p-2 mb-4 rounded"
               value={editing.quantity || 0}
               onChange={(e) =>
                 setEditing({
