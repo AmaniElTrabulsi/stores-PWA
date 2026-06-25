@@ -19,7 +19,7 @@ export default function ProductsManager({
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // 🔍 SEARCH (name OR barcode)
+  // 🔍 FILTER (name OR barcode)
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
 
@@ -31,15 +31,15 @@ export default function ProductsManager({
     });
   }, [products, query]);
 
-  // 📷 SCANNER (SAFE + BACK CAMERA)
+  // 📷 SCANNER (SAFE — NO NAVIGATION EVER)
   useEffect(() => {
     if (!scannerOpen) return;
 
-    let html5QrCode: Html5Qrcode | null = null;
+    let scanner: Html5Qrcode | null = null;
 
-    const startScanner = async () => {
+    const start = async () => {
       try {
-        html5QrCode = new Html5Qrcode("reader");
+        scanner = new Html5Qrcode("reader");
 
         const devices = await Html5Qrcode.getCameras();
 
@@ -50,32 +50,25 @@ export default function ProductsManager({
             d.label.toLowerCase().includes("back")
           )?.id || devices[0].id;
 
-        await html5QrCode.start(
+        await scanner.start(
           backCamera,
           {
             fps: 10,
             qrbox: 250,
           },
           (decodedText: string) => {
-            console.log("SCAN:", decodedText);
+            const clean = String(decodedText).trim();
 
-            // 🚨 HARD SAFETY: prevent URL navigation bugs
-            const cleanText = String(decodedText).trim();
+            console.log("SCAN RESULT:", clean);
 
-            if (
-              cleanText.startsWith("http") ||
-              cleanText.startsWith("www")
-            ) {
-              console.warn("Blocked URL scan:", cleanText);
-              return;
-            }
+            // 🚨 ONLY ACTION: fill search bar
+            setQuery(clean);
 
             const product = (products || []).find(
-              (p) => String(p.barcode) === cleanText
+              (p) => String(p.barcode) === clean
             );
 
             if (product) {
-              setQuery(cleanText);
               setFoundId(product.id);
 
               setTimeout(() => {
@@ -84,27 +77,23 @@ export default function ProductsManager({
                   block: "center",
                 });
               }, 200);
-            } else {
-              console.warn("Product not found for barcode:", cleanText);
             }
 
-            html5QrCode?.stop();
+            scanner?.stop();
             setScannerOpen(false);
           },
-          () => {
-            // ignore scan errors
-          }
+          () => {}
         );
       } catch (err) {
         console.error("Scanner error:", err);
       }
     };
 
-    startScanner();
+    start();
 
     return () => {
-      if (html5QrCode) {
-        html5QrCode.stop().catch(() => {});
+      if (scanner) {
+        scanner.stop().catch(() => {});
       }
     };
   }, [scannerOpen, products]);
@@ -155,10 +144,8 @@ export default function ProductsManager({
       {/* SCANNER */}
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
-          <div
-            id="reader"
-            className="w-full rounded-xl overflow-hidden"
-          />
+          <div id="reader" className="w-full" />
+
           <button
             onClick={() => setScannerOpen(false)}
             className="mt-2 w-full border rounded-xl p-2"
@@ -189,11 +176,7 @@ export default function ProductsManager({
               foundId === p.id ? "bg-green-100" : ""
             }`}
           >
-
-            <div className="font-medium">
-              {p.name}
-            </div>
-
+            <div className="font-medium">{p.name}</div>
             <div>{p.quantity ?? 0}</div>
 
             <div className="flex gap-2">
