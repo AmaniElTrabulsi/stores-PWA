@@ -4,9 +4,12 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-export default function ProductManager({ products }: { products: any[] }) {
+export default function ProductsManager({
+  products = [],
+}: {
+  products?: any[];
+}) {
   const router = useRouter();
-
   const [editing, setEditing] = useState<any | null>(null);
 
   const deleteProduct = async (id: string) => {
@@ -32,84 +35,125 @@ export default function ProductManager({ products }: { products: any[] }) {
   };
 
   return (
-    <div className="bg-white border rounded-2xl overflow-hidden">
+    <div className="bg-white rounded-2xl shadow overflow-hidden">
 
-      {/* HEADER */}
-      <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 text-sm font-semibold">
-        <div>Product</div>
-        <div>Barcode</div>
-        <div>Price</div>
-        <div>Stock</div>
-        <div>Actions</div>
-      </div>
+      <table className="w-full">
+        <thead>
+          <tr className="bg-gray-100 text-left">
+            <th className="p-4">Product</th>
+            <th className="p-4">Barcode</th>
+            <th className="p-4">Price</th>
+            <th className="p-4">Stock</th>
+            <th className="p-4">Actions</th>
+          </tr>
+        </thead>
 
-      {/* ROWS */}
-      {products.map((p) => (
-        <div
-          key={p.id}
-          className="grid grid-cols-5 gap-4 p-4 border-t items-center"
-        >
-          <div className="truncate">{p.name}</div>
-          <div className="text-sm text-gray-600">{p.barcode || "—"}</div>
-          <div>${p.price ?? 0}</div>
-          <div>{p.quantity ?? 0}</div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setEditing(p)}
-              className="px-3 py-1 text-xs bg-gray-100 rounded"
+        <tbody>
+          {(products ?? []).map((product) => (
+            <tr
+              key={product.id}
+              className="border-t hover:bg-gray-50"
             >
-              Edit
-            </button>
+              <td className="p-4 font-medium">
+                {product.name}
+              </td>
 
-            <button
-              onClick={() => deleteProduct(p.id)}
-              className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))}
+              <td className="p-4 text-gray-600">
+                {product.barcode || "—"}
+              </td>
 
-      {/* EDIT MODAL */}
+              <td className="p-4">
+                ${product.price ?? 0}
+              </td>
+
+              <td className="p-4">
+                {product.quantity ?? 0}
+              </td>
+
+              <td className="p-4">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditing(product)}
+                    className="px-3 py-1 rounded bg-blue-100 text-blue-700"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() => deleteProduct(product.id)}
+                    className="px-3 py-1 rounded bg-red-100 text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+
+          {products.length === 0 && (
+            <tr>
+              <td
+                colSpan={5}
+                className="text-center p-10 text-gray-500"
+              >
+                No products found
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md p-6 rounded-2xl">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
 
-            <h2 className="text-lg font-bold mb-4">Edit Product</h2>
+            <h2 className="text-xl font-bold mb-4">
+              Edit Product
+            </h2>
 
             <input
-              className="w-full border p-2 mb-2 rounded"
+              className="w-full border rounded p-2 mb-2"
               value={editing.name || ""}
               onChange={(e) =>
-                setEditing({ ...editing, name: e.target.value })
+                setEditing({
+                  ...editing,
+                  name: e.target.value,
+                })
               }
             />
 
             <input
-              className="w-full border p-2 mb-2 rounded"
+              className="w-full border rounded p-2 mb-2"
               value={editing.barcode || ""}
               onChange={(e) =>
-                setEditing({ ...editing, barcode: e.target.value })
+                setEditing({
+                  ...editing,
+                  barcode: e.target.value,
+                })
               }
             />
 
             <input
               type="number"
-              className="w-full border p-2 mb-2 rounded"
+              className="w-full border rounded p-2 mb-2"
               value={editing.price || 0}
               onChange={(e) =>
-                setEditing({ ...editing, price: Number(e.target.value) })
+                setEditing({
+                  ...editing,
+                  price: Number(e.target.value),
+                })
               }
             />
 
             <input
               type="number"
-              className="w-full border p-2 mb-4 rounded"
+              className="w-full border rounded p-2 mb-4"
               value={editing.quantity || 0}
               onChange={(e) =>
-                setEditing({ ...editing, quantity: Number(e.target.value) })
+                setEditing({
+                  ...editing,
+                  quantity: Number(e.target.value),
+                })
               }
             />
 
