@@ -21,10 +21,10 @@ export default function ProductsManager({
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // =========================
-  // FAST LOOKUP MAP (performance boost)
+  // FAST PRODUCT LOOKUP
   // =========================
   const productMap = useMemo(() => {
-    const map = new Map();
+    const map = new Map<string, any>();
     (products || []).forEach((p) => map.set(p.id, p));
     return map;
   }, [products]);
@@ -69,6 +69,7 @@ export default function ProductsManager({
     if (days === null) return null;
     if (days < 0) return "EXPIRED";
     if (days <= 60) return `EXP: ${days}d`;
+
     return null;
   };
 
@@ -207,7 +208,7 @@ export default function ProductsManager({
   };
 
   // =========================
-  // SELECT (FAST)
+  // FAST SELECT HANDLER
   // =========================
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -219,7 +220,7 @@ export default function ProductsManager({
   return (
     <div className="space-y-4 text-black">
 
-      {/* SEARCH + SCAN */}
+      {/* SEARCH */}
       <div className="flex gap-2">
         <input
           className="w-full border rounded-xl p-3"
@@ -266,7 +267,9 @@ export default function ProductsManager({
           return (
             <div
               key={p.id}
-              ref={(el) => (rowRefs.current[p.id] = el)}
+              ref={(el) => {
+                rowRefs.current[p.id] = el;
+              }} // ✅ FIXED (no return value)
               className={`grid grid-cols-[4fr_1fr_2fr] p-4 border-t cursor-pointer transition text-black
                 ${
                   foundId === p.id
@@ -277,6 +280,7 @@ export default function ProductsManager({
                 }
               `}
             >
+
               {/* NAME */}
               <div
                 className="font-medium truncate"
@@ -296,7 +300,7 @@ export default function ProductsManager({
                 {p.quantity ?? 0}
               </div>
 
-              {/* STATUS LABELS */}
+              {/* STATUS */}
               <div className="text-sm font-medium">
                 {label && (
                   <span
@@ -327,8 +331,8 @@ export default function ProductsManager({
             <p><b>Barcode:</b> {selected.barcode}</p>
             <p><b>Price:</b> {selected.price}</p>
             <p><b>Stock:</b> {selected.quantity}</p>
-            <p><b>Status:</b> {selected.status || "active"}</p>
-            <p><b>Expiry Date:</b> {selected.expiry_date || "—"}</p>
+            <p><b>Status:</b> {selected.status}</p>
+            <p><b>Expiry:</b> {selected.expiry_date || "—"}</p>
             <p><b>Description:</b> {selected.description || "—"}</p>
 
             <div className="flex flex-wrap gap-2 pt-3">
@@ -401,8 +405,8 @@ export default function ProductsManager({
             />
 
             <input
-              type="number"
               className="w-full border p-2 rounded"
+              type="number"
               value={editing.price || 0}
               onChange={(e) =>
                 setEditing({ ...editing, price: Number(e.target.value) })
@@ -410,8 +414,8 @@ export default function ProductsManager({
             />
 
             <input
-              type="number"
               className="w-full border p-2 rounded"
+              type="number"
               value={editing.quantity || 0}
               onChange={(e) =>
                 setEditing({ ...editing, quantity: Number(e.target.value) })
@@ -419,8 +423,8 @@ export default function ProductsManager({
             />
 
             <input
-              type="date"
               className="w-full border p-2 rounded"
+              type="date"
               value={editing.expiry_date || ""}
               onChange={(e) =>
                 setEditing({ ...editing, expiry_date: e.target.value })
