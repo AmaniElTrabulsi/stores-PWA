@@ -1,477 +1,308 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function ProductsManager({
   products,
 }: {
   products: any[];
+  storeId: string;
 }) {
-  const router = useRouter();
-
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<any | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [foundId, setFoundId] = useState<string | null>(null);
+  const [localProducts, setLocalProducts] = useState(products);
+  const [selected, setSelected] = useState<any | null>(null);
 
-  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [form, setForm] = useState({
+    name: "",
+    barcode: "",
+    price: "",
+    quantity: "",
+    expiry_date: "",
+    description: "",
+  });
 
-  // =========================
-  // FAST LOOKUP
-  // =========================
-  const productMap = useMemo(() => {
-    const map = new Map<string, any>();
-    (products || []).forEach((p) => map.set(p.id, p));
-    return map;
-  }, [products]);
-
-  const selected = selectedId ? productMap.get(selectedId) : null;
-
-  // =========================
+  // -------------------------
   // SEARCH
-  // =========================
-  const filtered = useMemo(() => {
+  // -------------------------
+  const filtered = localProducts.filter((p) => {
     const q = query.toLowerCase();
-
-    return (products || []).filter((p) => {
-      return (
-        p.name?.toLowerCase().includes(q) ||
-        String(p.barcode || "").toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q)
-      );
-    });
-  }, [products, query]);
-
-  // =========================
-  // EXPIRY
-  // =========================
-  const getDaysUntilExpiry = (expiryDate?: string) => {
-    if (!expiryDate) return null;
-
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-
-    today.setHours(0, 0, 0, 0);
-    expiry.setHours(0, 0, 0, 0);
-
-    return Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.barcode?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q)
     );
+  });
+
+  // -------------------------
+  // OPEN PRODUCT
+  // -------------------------
+  const openProduct = (p: any) => {
+    setSelected(p);
+
+    setForm({
+      name: p.name || "",
+      barcode: p.barcode || "",
+      price: p.price?.toString() || "",
+      quantity: p.quantity?.toString() || "",
+      expiry_date: p.expiry_date || "",
+      description: p.description || "",
+    });
   };
 
-  const getExpiryLabel = (p: any) => {
-    const days = getDaysUntilExpiry(p.expiry_date);
-
-    if (days === null) return null;
-    if (days < 0) return "EXPIRED";
-    if (days <= 60) return `EXP: ${days}d`;
-
-    return null;
-  };
-
-  const getExpiryClass = (p: any) => {
-    const days = getDaysUntilExpiry(p.expiry_date);
-
-    if (days === null) return "";
-    if (days < 0) return "bg-red-100";
-    if (days <= 60) return "bg-yellow-100";
-    return "";
-  };
-
-  const isOutOfStock = (p: any) => p.status === "out_of_stock";
-
-  // =========================
-  // SCANNER
-  // =========================
-  useEffect(() => {
-    if (!scannerOpen) return;
-
-    let scanner: Html5Qrcode | null = null;
-    let running = false;
-
-    const startScanner = async () => {
-      try {
-        scanner = new Html5Qrcode("reader");
-
-        const devices = await Html5Qrcode.getCameras();
-        if (!devices?.length) return;
-
-        const backCamera =
-          devices.find((d) =>
-            d.label.toLowerCase().includes("back")
-          )?.id || devices[0].id;
-
-        await scanner.start(
-          backCamera,
-          { fps: 10, qrbox: 250 },
-          (decodedText: string) => {
-            const clean = String(decodedText).trim();
-
-            setQuery(clean);
-
-            const product = (products || []).find(
-              (p) => String(p.barcode) === clean
-            );
-
-            if (product) {
-              setFoundId(product.id);
-
-              setTimeout(() => {
-                rowRefs.current[product.id]?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }, 150);
-            }
-
-            setScannerOpen(false);
-
-            if (running) {
-              running = false;
-              scanner?.stop().catch(() => {});
-            }
-          },
-          () => {}
-        );
-
-        running = true;
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    startScanner();
-
-    return () => {
-      if (scanner && running) {
-        running = false;
-        scanner.stop().catch(() => {});
-      }
-    };
-  }, [scannerOpen, products]);
-
-  // =========================
-  // ACTIONS
-  // =========================
-  const deleteProduct = async (id: string) => {
-    await supabase.from("products").delete().eq("id", id);
-    setSelectedId(null);
-    router.refresh();
-  };
-
+  // -------------------------
+  // SAVE
+  // -------------------------
   const saveProduct = async () => {
-    if (!editing) return;
+    if (!selected?.id) {
+      alert("No product selected");
+      return;
+    }
 
-    await supabase
+    const payload = {
+      name: form.name,
+      barcode: form.barcode,
+      price: Number(form.price) || null,
+      quantity: Number(form.quantity) || 0,
+      expiry_date: form.expiry_date || null,
+      description: form.description,
+    };
+
+    const { error } = await supabase
       .from("products")
-      .update({
-        name: editing.name,
-        barcode: editing.barcode,
-        price: editing.price,
-        quantity: editing.quantity,
-        description: editing.description,
-        expiry_date: editing.expiry_date,
-      })
-      .eq("id", editing.id);
+      .update(payload)
+      .eq("id", selected.id);
 
-    setEditing(null);
-    setSelectedId(null);
-    router.refresh();
+    if (error) {
+      console.error("SAVE ERROR:", error);
+      alert(error.message);
+      return;
+    }
+
+    setLocalProducts((prev) =>
+      prev.map((p) =>
+        p.id === selected.id ? { ...p, ...payload } : p
+      )
+    );
+
+    setSelected(null);
   };
 
-  const markOutOfStock = async (id: string) => {
-    await supabase
-      .from("products")
-      .update({ status: "out_of_stock" })
-      .eq("id", id);
+  // -------------------------
+  // SCANNER
+  // -------------------------
+  const startScanner = async () => {
+    const scanner = new Html5Qrcode("reader");
 
-    router.refresh();
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        async (barcode: string) => {
+          await scanner.stop();
+
+          const { data } = await supabase
+            .from("products")
+            .select("*")
+            .eq("barcode", barcode)
+            .single();
+
+          if (data) openProduct(data);
+          else alert("Product not found");
+        }
+      );
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const restockProduct = async (id: string) => {
-    const qty = prompt("Enter new stock quantity:", "10");
-    if (!qty) return;
+  // -------------------------
+  // 🔥 FIXED EXPIRY LOGIC (NO BUGS)
+  // -------------------------
+  const getExpiry = (date?: string) => {
+    if (!date) return null;
 
-    await supabase
-      .from("products")
-      .update({
-        status: "active",
-        quantity: Number(qty),
-      })
-      .eq("id", id);
+    const exp = new Date(date);
+    const now = new Date();
 
-    router.refresh();
+    // IMPORTANT: remove time part (fixes 0-day bug)
+    exp.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor(
+      (exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // 🔴 EXPIRED (today OR past)
+    if (diffDays <= 0) {
+      return {
+        text: `EXPIRED`,
+        type: "expired",
+      };
+    }
+
+    // 🟡 WARNING
+    if (diffDays <= 60) {
+      return {
+        text: `Exp in ${diffDays}d`,
+        type: "warning",
+      };
+    }
+
+    return {
+      text: `Exp in ${diffDays}d`,
+      type: "normal",
+    };
   };
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id);
-  }, []);
-
-  // =========================
-  // UI
-  // =========================
   return (
-    <div className="space-y-4 text-black">
+    <div className="space-y-4">
 
-      {/* SEARCH */}
+      {/* SCAN + SEARCH */}
       <div className="flex gap-2">
-        <input
-          className="w-full border rounded-xl p-3"
-          placeholder="Search medicine..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-
         <button
-          onClick={() => setScannerOpen(true)}
-          className="px-4 bg-black text-white rounded-xl"
+          onClick={startScanner}
+          className="bg-black text-white px-4 py-2 rounded-xl"
         >
           Scan
         </button>
+
+        <input
+          className="w-full border p-3 rounded-xl"
+          placeholder="Search products..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
 
-      {/* SCANNER */}
-      {scannerOpen && (
-        <div className="p-4 border rounded-xl">
-          <div id="reader" />
-          <button
-            onClick={() => setScannerOpen(false)}
-            className="mt-2 w-full border rounded-xl p-2"
-          >
-            Close
-          </button>
-        </div>
-      )}
+      <div id="reader" />
 
-      {/* TABLE */}
-      <div className="bg-white border rounded-2xl overflow-hidden">
+      {/* LIST */}
+      <div className="bg-white border rounded-xl">
+        {filtered.map((p) => {
+          const exp = getExpiry(p.expiry_date);
 
-        <div className="grid grid-cols-[4fr_1fr_2fr] p-4 bg-gray-50 font-semibold text-sm">
-          <div>Product</div>
-          <div>Stock</div>
-          <div>Status</div>
-        </div>
+          let rowClass =
+            "flex justify-between p-3 border-b cursor-pointer hover:bg-gray-50";
 
-        {filtered?.map((p) => {
-          const label = getExpiryLabel(p);
+          if (exp?.type === "expired") {
+            rowClass =
+              "flex justify-between p-3 border-b cursor-pointer bg-red-600 text-white hover:bg-red-700 font-bold";
+          } else if (exp?.type === "warning") {
+            rowClass =
+              "flex justify-between p-3 border-b cursor-pointer bg-yellow-100 text-yellow-900 hover:bg-yellow-200";
+          }
 
           return (
             <div
               key={p.id}
-              ref={(el) => {
-                rowRefs.current[p.id] = el;
-              }}
-              className={`grid grid-cols-[4fr_1fr_2fr] p-4 border-t cursor-pointer text-black transition
-                ${
-                  foundId === p.id
-                    ? "bg-green-100"
-                    : isOutOfStock(p)
-                    ? "bg-orange-100"
-                    : getExpiryClass(p)
-                }
-              `}
+              onClick={() => openProduct(p)}
+              className={rowClass}
             >
-              <div
-                className="font-medium truncate"
-                onClick={() => handleSelect(p.id)}
-              >
-                {p.name}
+              {/* LEFT */}
+              <div>
+                <div className="font-bold">{p.name}</div>
 
-                {isOutOfStock(p) && (
-                  <span className="ml-2 text-xs bg-orange-200 px-2 py-1 rounded">
-                    OUT OF STOCK
-                  </span>
+                <div className="text-sm opacity-80">
+                  {p.barcode}
+                </div>
+
+                {exp && (
+                  <div className="text-xs mt-1 font-semibold">
+                    {exp.text}
+                  </div>
                 )}
               </div>
 
-              <div className="text-center font-medium">
+              {/* RIGHT */}
+              <div className="font-bold text-lg">
                 {p.quantity ?? 0}
-              </div>
-
-              <div className="text-sm font-medium">
-                {label && (
-                  <span
-                    className={
-                      label === "EXPIRED"
-                        ? "text-red-600 font-bold"
-                        : "text-yellow-700"
-                    }
-                  >
-                    {label}
-                  </span>
-                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* =========================
-          DETAILS MODAL
-      ========================= */}
+      {/* MODAL */}
       {selected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-3 text-black">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-xl w-[420px] space-y-3">
 
-            <h2 className="text-xl font-bold">{selected.name}</h2>
+            <h2 className="text-xl font-bold">Edit Product</h2>
 
-            <p><b>Barcode:</b> {selected.barcode}</p>
-            <p><b>Price:</b> {selected.price}</p>
-            <p><b>Stock:</b> {selected.quantity}</p>
-            <p><b>Status:</b> {selected.status}</p>
-            <p><b>Expiry Date:</b> {selected.expiry_date || "—"}</p>
-            <p><b>Description:</b> {selected.description || "—"}</p>
+            <input
+              className="border p-2 w-full"
+              value={form.name}
+              onChange={(e) =>
+                setForm({ ...form, name: e.target.value })
+              }
+              placeholder="Name"
+            />
 
-            <div className="flex flex-wrap gap-2 pt-3">
+            <input
+              className="border p-2 w-full"
+              value={form.barcode}
+              onChange={(e) =>
+                setForm({ ...form, barcode: e.target.value })
+              }
+              placeholder="Barcode"
+            />
 
-              <button
-                onClick={() => setEditing(selected)}
-                className="px-3 py-2 bg-gray-100 rounded"
-              >
-                Edit
-              </button>
+            <input
+              className="border p-2 w-full"
+              type="number"
+              value={form.price}
+              onChange={(e) =>
+                setForm({ ...form, price: e.target.value })
+              }
+              placeholder="Price"
+            />
 
-              <button
-                onClick={() => markOutOfStock(selected.id)}
-                className="px-3 py-2 bg-orange-100 rounded"
-              >
-                Mark Finished
-              </button>
+            <input
+              className="border p-2 w-full"
+              type="number"
+              value={form.quantity}
+              onChange={(e) =>
+                setForm({ ...form, quantity: e.target.value })
+              }
+              placeholder="Stock"
+            />
 
-              {selected.status === "out_of_stock" && (
-                <button
-                  onClick={() => restockProduct(selected.id)}
-                  className="px-3 py-2 bg-green-100 rounded"
-                >
-                  Restock
-                </button>
-              )}
+            <input
+              className="border p-2 w-full"
+              type="date"
+              value={form.expiry_date}
+              onChange={(e) =>
+                setForm({ ...form, expiry_date: e.target.value })
+              }
+            />
 
-              <button
-                onClick={() => deleteProduct(selected.id)}
-                className="px-3 py-2 bg-red-100 text-red-600 rounded"
-              >
-                Delete
-              </button>
-
-              <button
-                onClick={() => setSelectedId(null)}
-                className="ml-auto px-3 py-2 border rounded"
-              >
-                Close
-              </button>
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* =========================
-          EDIT MODAL (WITH LABELS)
-      ========================= */}
-      {editing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-4 text-black">
-
-            <h2 className="text-lg font-bold">Edit Product</h2>
-
-            {/* NAME */}
-            <div>
-              <label className="text-sm font-medium">Product Name</label>
-              <input
-                className="w-full border p-2 rounded mt-1"
-                value={editing.name || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, name: e.target.value })
-                }
-              />
-            </div>
-
-            {/* BARCODE */}
-            <div>
-              <label className="text-sm font-medium">Barcode</label>
-              <input
-                className="w-full border p-2 rounded mt-1"
-                value={editing.barcode || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, barcode: e.target.value })
-                }
-              />
-            </div>
-
-            {/* PRICE */}
-            <div>
-              <label className="text-sm font-medium">Price</label>
-              <input
-                type="number"
-                className="w-full border p-2 rounded mt-1"
-                value={editing.price || 0}
-                onChange={(e) =>
-                  setEditing({ ...editing, price: Number(e.target.value) })
-                }
-              />
-            </div>
-
-            {/* QUANTITY */}
-            <div>
-              <label className="text-sm font-medium">Stock Quantity</label>
-              <input
-                type="number"
-                className="w-full border p-2 rounded mt-1"
-                value={editing.quantity || 0}
-                onChange={(e) =>
-                  setEditing({ ...editing, quantity: Number(e.target.value) })
-                }
-              />
-            </div>
-
-            {/* EXPIRY */}
-            <div>
-              <label className="text-sm font-medium">Expiry Date</label>
-              <input
-                type="date"
-                className="w-full border p-2 rounded mt-1"
-                value={editing.expiry_date || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, expiry_date: e.target.value })
-                }
-              />
-            </div>
-
-            {/* DESCRIPTION */}
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                className="w-full border p-2 rounded mt-1"
-                value={editing.description || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, description: e.target.value })
-                }
-              />
-            </div>
+            <textarea
+              className="border p-2 w-full"
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              placeholder="Description"
+            />
 
             {/* ACTIONS */}
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-between mt-4">
 
               <button
-                onClick={() => setEditing(null)}
-                className="px-4 py-2 border rounded"
+                onClick={() => setSelected(null)}
+                className="px-3 py-2 border rounded"
               >
                 Cancel
               </button>
 
               <button
                 onClick={saveProduct}
-                className="px-4 py-2 bg-black text-white rounded"
+                className="px-3 py-2 bg-black text-white rounded"
               >
                 Save
               </button>
-
             </div>
 
           </div>
