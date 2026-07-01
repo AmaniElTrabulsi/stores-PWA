@@ -62,10 +62,7 @@ export default function ProductsManager({
     return days !== null && days >= 0 && days <= 60;
   };
 
-  const expiringProducts = (products || []).filter(
-    (p) =>
-      isExpired(p.expiry_date) || isExpiringSoon(p.expiry_date)
-  );
+  const isOutOfStock = (p: any) => p.status === "out_of_stock";
 
   // =========================
   // SCANNER
@@ -111,19 +108,19 @@ export default function ProductsManager({
               }, 200);
             }
 
+            setScannerOpen(false);
+
             if (running) {
               running = false;
               scanner?.stop().catch(() => {});
             }
-
-            setScannerOpen(false);
           },
           () => {}
         );
 
         running = true;
       } catch (err) {
-        console.error("Scanner error:", err);
+        console.error(err);
       }
     };
 
@@ -138,16 +135,14 @@ export default function ProductsManager({
   }, [scannerOpen, products]);
 
   // =========================
-  // DELETE
+  // ACTIONS
   // =========================
   const deleteProduct = async (id: string) => {
     await supabase.from("products").delete().eq("id", id);
+    setSelected(null);
     router.refresh();
   };
 
-  // =========================
-  // SAVE
-  // =========================
   const saveProduct = async () => {
     if (!editing) return;
 
@@ -159,11 +154,36 @@ export default function ProductsManager({
         price: editing.price,
         quantity: editing.quantity,
         description: editing.description,
+        expiry_date: editing.expiry_date,
       })
       .eq("id", editing.id);
 
     setEditing(null);
     setSelected(null);
+    router.refresh();
+  };
+
+  const markOutOfStock = async (id: string) => {
+    await supabase
+      .from("products")
+      .update({ status: "out_of_stock" })
+      .eq("id", id);
+
+    router.refresh();
+  };
+
+  const restockProduct = async (id: string) => {
+    const qty = prompt("Enter new stock quantity:", "10");
+    if (!qty) return;
+
+    await supabase
+      .from("products")
+      .update({
+        status: "active",
+        quantity: Number(qty),
+      })
+      .eq("id", id);
+
     router.refresh();
   };
 
@@ -173,18 +193,11 @@ export default function ProductsManager({
   return (
     <div className="space-y-4 text-black">
 
-      {/* EXPIRY ALERT */}
-      {expiringProducts.length > 0 && (
-        <div className="bg-yellow-100 border border-yellow-300 p-3 rounded-xl text-black">
-          ⚠️ {expiringProducts.length} product(s) expired or expiring soon
-        </div>
-      )}
-
       {/* SEARCH + SCAN */}
       <div className="flex gap-2">
         <input
           className="w-full border rounded-xl p-3 text-black"
-          placeholder="Search by name or barcode..."
+          placeholder="Search medicine..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -200,12 +213,12 @@ export default function ProductsManager({
       {/* SCANNER */}
       {scannerOpen && (
         <div className="p-4 border rounded-xl">
-          <div id="reader" className="w-full" />
+          <div id="reader" />
           <button
             onClick={() => setScannerOpen(false)}
-            className="mt-2 w-full border rounded-xl p-2 text-black"
+            className="mt-2 w-full border rounded-xl p-2"
           >
-            Close Scanner
+            Close
           </button>
         </div>
       )}
@@ -214,102 +227,120 @@ export default function ProductsManager({
       <div className="bg-white border rounded-2xl overflow-hidden">
 
         {/* HEADER */}
-        <div className="grid grid-cols-[4fr_1fr_1.6fr] p-4 bg-gray-50 font-semibold text-sm text-black">
+        <div className="grid grid-cols-[4fr_1fr] p-4 bg-gray-50 font-semibold text-sm">
           <div>Product</div>
           <div>Stock</div>
-          <div>Actions</div>
         </div>
 
         {/* ROWS */}
         {filtered?.map((p) => (
           <div
             key={p.id}
-            ref={(el) => {
-              rowRefs.current[p.id] = el;
-            }}
-            className={`grid grid-cols-[4fr_1fr_1.6fr] p-4 border-t transition text-black
-              ${
-                foundId === p.id
-                  ? "bg-green-100"
-                  : isExpired(p.expiry_date)
-                  ? "bg-red-100"
-                  : isExpiringSoon(p.expiry_date)
-                  ? "bg-yellow-100"
-                  : ""
-              }
-            `}
+            className={`grid grid-cols-[4fr_1fr] p-4 border-t cursor-pointer text-black ${
+              foundId === p.id
+                ? "bg-green-100"
+                : isOutOfStock(p)
+                ? "bg-orange-100"
+                : isExpired(p.expiry_date)
+                ? "bg-red-100"
+                : isExpiringSoon(p.expiry_date)
+                ? "bg-yellow-100"
+                : ""
+            }`}
           >
-
-            {/* PRODUCT */}
+            {/* NAME */}
             <div
-              className="font-medium truncate cursor-pointer text-black"
+              className="font-medium truncate"
               onClick={() => setSelected(p)}
             >
               {p.name}
+              {isOutOfStock(p) && (
+                <span className="ml-2 text-xs bg-orange-200 px-2 py-1 rounded">
+                  OUT OF STOCK
+                </span>
+              )}
             </div>
 
             {/* STOCK */}
-            <div className="text-center font-medium text-black">
+            <div className="text-center font-medium">
               {p.quantity ?? 0}
             </div>
+          </div>
+        ))}
+      </div>
 
-            {/* ACTIONS */}
-            <div className="flex gap-2">
+      {/* =========================
+          DETAILS MODAL
+      ========================= */}
+      {selected && !editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2 text-black">
+
+            <h2 className="text-xl font-bold">{selected.name}</h2>
+
+            <p><b>Barcode:</b> {selected.barcode}</p>
+            <p><b>Price:</b> {selected.price}</p>
+            <p><b>Stock:</b> {selected.quantity}</p>
+            <p><b>Status:</b> {selected.status || "active"}</p>
+            <p><b>Expiry Date:</b> {selected.expiry_date || "—"}</p>
+            <p><b>Description:</b> {selected.description || "—"}</p>
+
+            <div className="flex flex-wrap gap-2 pt-3">
+
               <button
-                onClick={() => setEditing(p)}
-                className="px-3 py-1 text-xs bg-gray-100 rounded text-black"
+                onClick={() => setEditing(selected)}
+                className="px-3 py-2 bg-gray-100 rounded"
               >
                 Edit
               </button>
 
               <button
-                onClick={() => deleteProduct(p.id)}
-                className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded"
+                onClick={() => markOutOfStock(selected.id)}
+                className="px-3 py-2 bg-orange-100 rounded"
+              >
+                Mark Finished
+              </button>
+
+              {selected.status === "out_of_stock" && (
+                <button
+                  onClick={() => restockProduct(selected.id)}
+                  className="px-3 py-2 bg-green-100 rounded"
+                >
+                  Restock
+                </button>
+              )}
+
+              <button
+                onClick={() => deleteProduct(selected.id)}
+                className="px-3 py-2 bg-red-100 text-red-600 rounded"
               >
                 Delete
               </button>
-            </div>
 
-          </div>
-        ))}
-      </div>
-
-      {/* VIEW MODAL */}
-      {selected && !editing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2 text-black">
-
-            <h2 className="text-xl font-bold">Product Details</h2>
-
-            <p><b>Name:</b> {selected.name}</p>
-            <p><b>Barcode:</b> {selected.barcode}</p>
-            <p><b>Price:</b> {selected.price}</p>
-            <p><b>Stock:</b> {selected.quantity}</p>
-            <p><b>Description:</b> {selected.description || "—"}</p>
-
-            <div className="flex justify-end pt-3">
               <button
                 onClick={() => setSelected(null)}
-                className="px-4 py-2 border rounded text-black"
+                className="ml-auto px-3 py-2 border rounded"
               >
                 Close
               </button>
+
             </div>
 
           </div>
         </div>
       )}
 
-      {/* EDIT MODAL */}
+      {/* =========================
+          EDIT MODAL
+      ========================= */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-
           <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2 text-black">
 
             <h2 className="text-lg font-bold">Edit Product</h2>
 
             <input
-              className="w-full border p-2 rounded text-black"
+              className="w-full border p-2 rounded"
               value={editing.name || ""}
               onChange={(e) =>
                 setEditing({ ...editing, name: e.target.value })
@@ -318,7 +349,7 @@ export default function ProductsManager({
             />
 
             <input
-              className="w-full border p-2 rounded text-black"
+              className="w-full border p-2 rounded"
               value={editing.barcode || ""}
               onChange={(e) =>
                 setEditing({ ...editing, barcode: e.target.value })
@@ -327,8 +358,8 @@ export default function ProductsManager({
             />
 
             <input
+              className="w-full border p-2 rounded"
               type="number"
-              className="w-full border p-2 rounded text-black"
               value={editing.price || 0}
               onChange={(e) =>
                 setEditing({ ...editing, price: Number(e.target.value) })
@@ -337,8 +368,8 @@ export default function ProductsManager({
             />
 
             <input
+              className="w-full border p-2 rounded"
               type="number"
-              className="w-full border p-2 rounded text-black"
               value={editing.quantity || 0}
               onChange={(e) =>
                 setEditing({ ...editing, quantity: Number(e.target.value) })
@@ -346,8 +377,17 @@ export default function ProductsManager({
               placeholder="Stock"
             />
 
+            <input
+              className="w-full border p-2 rounded"
+              type="date"
+              value={editing.expiry_date || ""}
+              onChange={(e) =>
+                setEditing({ ...editing, expiry_date: e.target.value })
+              }
+            />
+
             <textarea
-              className="w-full border p-2 rounded text-black"
+              className="w-full border p-2 rounded"
               value={editing.description || ""}
               onChange={(e) =>
                 setEditing({ ...editing, description: e.target.value })
@@ -359,7 +399,7 @@ export default function ProductsManager({
 
               <button
                 onClick={() => setEditing(null)}
-                className="px-4 py-2 border rounded text-black"
+                className="px-4 py-2 border rounded"
               >
                 Cancel
               </button>
