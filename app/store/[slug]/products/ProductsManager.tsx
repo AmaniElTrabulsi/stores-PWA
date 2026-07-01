@@ -55,10 +55,7 @@ export default function ProductsManager({
   // SAVE
   // -------------------------
   const saveProduct = async () => {
-    if (!selected?.id) {
-      alert("No product selected");
-      return;
-    }
+    if (!selected?.id) return;
 
     const payload = {
       name: form.name,
@@ -75,7 +72,6 @@ export default function ProductsManager({
       .eq("id", selected.id);
 
     if (error) {
-      console.error("SAVE ERROR:", error);
       alert(error.message);
       return;
     }
@@ -90,7 +86,45 @@ export default function ProductsManager({
   };
 
   // -------------------------
-  // SCANNER
+  // MARK DONE
+  // -------------------------
+  const markDone = async (p: any) => {
+    const { error } = await supabase
+      .from("products")
+      .update({ status: "out_of_stock" })
+      .eq("id", p.id);
+
+    if (!error) {
+      setLocalProducts((prev) =>
+        prev.map((x) =>
+          x.id === p.id ? { ...x, status: "out_of_stock" } : x
+        )
+      );
+    }
+  };
+
+  // -------------------------
+  // MARK RESTOCK
+  // -------------------------
+  const markRestocked = async (p: any) => {
+    const { error } = await supabase
+      .from("products")
+      .update({ status: "active", quantity: 10 })
+      .eq("id", p.id);
+
+    if (!error) {
+      setLocalProducts((prev) =>
+        prev.map((x) =>
+          x.id === p.id
+            ? { ...x, status: "active", quantity: 10 }
+            : x
+        )
+      );
+    }
+  };
+
+  // -------------------------
+  // SCANNER (FIXED 4 ARGS)
   // -------------------------
   const startScanner = async () => {
     const scanner = new Html5Qrcode("reader");
@@ -99,6 +133,8 @@ export default function ProductsManager({
       await scanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
+
+        // SUCCESS
         async (barcode: string) => {
           await scanner.stop();
 
@@ -110,7 +146,10 @@ export default function ProductsManager({
 
           if (data) openProduct(data);
           else alert("Product not found");
-        }
+        },
+
+        // ERROR CALLBACK (required by new version)
+        () => {}
       );
     } catch (err) {
       console.error(err);
@@ -118,7 +157,7 @@ export default function ProductsManager({
   };
 
   // -------------------------
-  // 🔥 FIXED EXPIRY LOGIC (NO BUGS)
+  // EXPIRY (FIXED 100%)
   // -------------------------
   const getExpiry = (date?: string) => {
     if (!date) return null;
@@ -126,40 +165,28 @@ export default function ProductsManager({
     const exp = new Date(date);
     const now = new Date();
 
-    // IMPORTANT: remove time part (fixes 0-day bug)
     exp.setHours(0, 0, 0, 0);
     now.setHours(0, 0, 0, 0);
 
-    const diffDays = Math.floor(
+    const diff = Math.floor(
       (exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    // 🔴 EXPIRED (today OR past)
-    if (diffDays <= 0) {
-      return {
-        text: `EXPIRED`,
-        type: "expired",
-      };
+    if (diff <= 0) {
+      return { text: "EXPIRED", type: "expired" };
     }
 
-    // 🟡 WARNING
-    if (diffDays <= 60) {
-      return {
-        text: `Exp in ${diffDays}d`,
-        type: "warning",
-      };
+    if (diff <= 60) {
+      return { text: `Exp in ${diff}d`, type: "warning" };
     }
 
-    return {
-      text: `Exp in ${diffDays}d`,
-      type: "normal",
-    };
+    return { text: `Exp in ${diff}d`, type: "normal" };
   };
 
   return (
     <div className="space-y-4">
 
-      {/* SCAN + SEARCH */}
+      {/* SEARCH + SCAN */}
       <div className="flex gap-2">
         <button
           onClick={startScanner}
@@ -186,38 +213,66 @@ export default function ProductsManager({
           let rowClass =
             "flex justify-between p-3 border-b cursor-pointer hover:bg-gray-50";
 
-          if (exp?.type === "expired") {
+          if (p.status === "out_of_stock") {
             rowClass =
-              "flex justify-between p-3 border-b cursor-pointer bg-red-600 text-white hover:bg-red-700 font-bold";
+              "flex justify-between p-3 border-b bg-gray-200 text-gray-600";
+          } else if (exp?.type === "expired") {
+            rowClass =
+              "flex justify-between p-3 border-b bg-red-600 text-white font-bold";
           } else if (exp?.type === "warning") {
             rowClass =
-              "flex justify-between p-3 border-b cursor-pointer bg-yellow-100 text-yellow-900 hover:bg-yellow-200";
+              "flex justify-between p-3 border-b bg-yellow-100 text-yellow-900";
           }
 
           return (
             <div
               key={p.id}
-              onClick={() => openProduct(p)}
               className={rowClass}
+              onClick={() => openProduct(p)}
             >
               {/* LEFT */}
               <div>
                 <div className="font-bold">{p.name}</div>
-
-                <div className="text-sm opacity-80">
-                  {p.barcode}
-                </div>
+                <div className="text-sm opacity-80">{p.barcode}</div>
 
                 {exp && (
                   <div className="text-xs mt-1 font-semibold">
                     {exp.text}
                   </div>
                 )}
+
+                {p.status === "out_of_stock" && (
+                  <div className="text-xs font-bold">
+                    OUT OF STOCK
+                  </div>
+                )}
               </div>
 
               {/* RIGHT */}
-              <div className="font-bold text-lg">
-                {p.quantity ?? 0}
+              <div className="flex gap-3 items-center">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markDone(p);
+                  }}
+                  className="text-red-500 text-sm"
+                >
+                  Done
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markRestocked(p);
+                  }}
+                  className="text-green-500 text-sm"
+                >
+                  Restock
+                </button>
+
+                <div className="font-bold">
+                  {p.quantity}
+                </div>
               </div>
             </div>
           );
@@ -237,7 +292,6 @@ export default function ProductsManager({
               onChange={(e) =>
                 setForm({ ...form, name: e.target.value })
               }
-              placeholder="Name"
             />
 
             <input
@@ -246,7 +300,6 @@ export default function ProductsManager({
               onChange={(e) =>
                 setForm({ ...form, barcode: e.target.value })
               }
-              placeholder="Barcode"
             />
 
             <input
@@ -256,7 +309,6 @@ export default function ProductsManager({
               onChange={(e) =>
                 setForm({ ...form, price: e.target.value })
               }
-              placeholder="Price"
             />
 
             <input
@@ -266,7 +318,6 @@ export default function ProductsManager({
               onChange={(e) =>
                 setForm({ ...form, quantity: e.target.value })
               }
-              placeholder="Stock"
             />
 
             <input
@@ -284,31 +335,18 @@ export default function ProductsManager({
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
-              placeholder="Description"
             />
 
-            {/* ACTIONS */}
-            <div className="flex justify-between mt-4">
-
-              <button
-                onClick={() => setSelected(null)}
-                className="px-3 py-2 border rounded"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={saveProduct}
-                className="px-3 py-2 bg-black text-white rounded"
-              >
-                Save
-              </button>
-            </div>
+            <button
+              onClick={saveProduct}
+              className="bg-black text-white px-4 py-2 rounded"
+            >
+              Save
+            </button>
 
           </div>
         </div>
       )}
-
     </div>
   );
 }
