@@ -21,7 +21,7 @@ export default function ProductsManager({
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // =========================
-  // FAST PRODUCT LOOKUP
+  // FAST LOOKUP
   // =========================
   const productMap = useMemo(() => {
     const map = new Map<string, any>();
@@ -47,7 +47,7 @@ export default function ProductsManager({
   }, [products, query]);
 
   // =========================
-  // EXPIRY LOGIC
+  // EXPIRY
   // =========================
   const getDaysUntilExpiry = (expiryDate?: string) => {
     if (!expiryDate) return null;
@@ -207,9 +207,6 @@ export default function ProductsManager({
     router.refresh();
   };
 
-  // =========================
-  // FAST SELECT HANDLER
-  // =========================
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
   }, []);
@@ -253,14 +250,12 @@ export default function ProductsManager({
       {/* TABLE */}
       <div className="bg-white border rounded-2xl overflow-hidden">
 
-        {/* HEADER */}
         <div className="grid grid-cols-[4fr_1fr_2fr] p-4 bg-gray-50 font-semibold text-sm">
           <div>Product</div>
           <div>Stock</div>
           <div>Status</div>
         </div>
 
-        {/* ROWS */}
         {filtered?.map((p) => {
           const label = getExpiryLabel(p);
 
@@ -269,8 +264,8 @@ export default function ProductsManager({
               key={p.id}
               ref={(el) => {
                 rowRefs.current[p.id] = el;
-              }} // ✅ FIXED (no return value)
-              className={`grid grid-cols-[4fr_1fr_2fr] p-4 border-t cursor-pointer transition text-black
+              }}
+              className={`grid grid-cols-[4fr_1fr_2fr] p-4 border-t cursor-pointer text-black transition
                 ${
                   foundId === p.id
                     ? "bg-green-100"
@@ -280,8 +275,6 @@ export default function ProductsManager({
                 }
               `}
             >
-
-              {/* NAME */}
               <div
                 className="font-medium truncate"
                 onClick={() => handleSelect(p.id)}
@@ -295,12 +288,10 @@ export default function ProductsManager({
                 )}
               </div>
 
-              {/* STOCK */}
               <div className="text-center font-medium">
                 {p.quantity ?? 0}
               </div>
 
-              {/* STATUS */}
               <div className="text-sm font-medium">
                 {label && (
                   <span
@@ -320,11 +311,11 @@ export default function ProductsManager({
       </div>
 
       {/* =========================
-          DETAIL MODAL
+          DETAILS MODAL
       ========================= */}
       {selected && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2 text-black">
+          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-3 text-black">
 
             <h2 className="text-xl font-bold">{selected.name}</h2>
 
@@ -332,7 +323,7 @@ export default function ProductsManager({
             <p><b>Price:</b> {selected.price}</p>
             <p><b>Stock:</b> {selected.quantity}</p>
             <p><b>Status:</b> {selected.status}</p>
-            <p><b>Expiry:</b> {selected.expiry_date || "—"}</p>
+            <p><b>Expiry Date:</b> {selected.expiry_date || "—"}</p>
             <p><b>Description:</b> {selected.description || "—"}</p>
 
             <div className="flex flex-wrap gap-2 pt-3">
@@ -375,71 +366,98 @@ export default function ProductsManager({
               </button>
 
             </div>
+
           </div>
         </div>
       )}
 
       {/* =========================
-          EDIT MODAL
+          EDIT MODAL (WITH LABELS)
       ========================= */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-2 text-black">
+          <div className="bg-white w-full max-w-lg p-6 rounded-2xl space-y-4 text-black">
 
             <h2 className="text-lg font-bold">Edit Product</h2>
 
-            <input
-              className="w-full border p-2 rounded"
-              value={editing.name || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, name: e.target.value })
-              }
-            />
+            {/* NAME */}
+            <div>
+              <label className="text-sm font-medium">Product Name</label>
+              <input
+                className="w-full border p-2 rounded mt-1"
+                value={editing.name || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, name: e.target.value })
+                }
+              />
+            </div>
 
-            <input
-              className="w-full border p-2 rounded"
-              value={editing.barcode || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, barcode: e.target.value })
-              }
-            />
+            {/* BARCODE */}
+            <div>
+              <label className="text-sm font-medium">Barcode</label>
+              <input
+                className="w-full border p-2 rounded mt-1"
+                value={editing.barcode || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, barcode: e.target.value })
+                }
+              />
+            </div>
 
-            <input
-              className="w-full border p-2 rounded"
-              type="number"
-              value={editing.price || 0}
-              onChange={(e) =>
-                setEditing({ ...editing, price: Number(e.target.value) })
-              }
-            />
+            {/* PRICE */}
+            <div>
+              <label className="text-sm font-medium">Price</label>
+              <input
+                type="number"
+                className="w-full border p-2 rounded mt-1"
+                value={editing.price || 0}
+                onChange={(e) =>
+                  setEditing({ ...editing, price: Number(e.target.value) })
+                }
+              />
+            </div>
 
-            <input
-              className="w-full border p-2 rounded"
-              type="number"
-              value={editing.quantity || 0}
-              onChange={(e) =>
-                setEditing({ ...editing, quantity: Number(e.target.value) })
-              }
-            />
+            {/* QUANTITY */}
+            <div>
+              <label className="text-sm font-medium">Stock Quantity</label>
+              <input
+                type="number"
+                className="w-full border p-2 rounded mt-1"
+                value={editing.quantity || 0}
+                onChange={(e) =>
+                  setEditing({ ...editing, quantity: Number(e.target.value) })
+                }
+              />
+            </div>
 
-            <input
-              className="w-full border p-2 rounded"
-              type="date"
-              value={editing.expiry_date || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, expiry_date: e.target.value })
-              }
-            />
+            {/* EXPIRY */}
+            <div>
+              <label className="text-sm font-medium">Expiry Date</label>
+              <input
+                type="date"
+                className="w-full border p-2 rounded mt-1"
+                value={editing.expiry_date || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, expiry_date: e.target.value })
+                }
+              />
+            </div>
 
-            <textarea
-              className="w-full border p-2 rounded"
-              value={editing.description || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, description: e.target.value })
-              }
-            />
+            {/* DESCRIPTION */}
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <textarea
+                className="w-full border p-2 rounded mt-1"
+                value={editing.description || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, description: e.target.value })
+                }
+              />
+            </div>
 
+            {/* ACTIONS */}
             <div className="flex justify-end gap-2 pt-2">
+
               <button
                 onClick={() => setEditing(null)}
                 className="px-4 py-2 border rounded"
@@ -453,6 +471,7 @@ export default function ProductsManager({
               >
                 Save
               </button>
+
             </div>
 
           </div>
